@@ -11,7 +11,4 @@ class GenericPowerAPI(AssetsAPI):
 
     def list(self, limit=None, **filters):
         filters["metadata"] = {**filters.get("metadata", {}), **self.metadata_filter}
-        return PowerAssetList(
-            [PowerAsset(cognite_client=self._cognite_client, **a.dump()) for a in super().list(limit=limit, **filters)],
-            cognite_client=self._cognite_client,
-        )
+        return PowerAssetList._load_assets(super().list(limit=limit, **filters), cognite_client=self._cognite_client)

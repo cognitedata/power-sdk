@@ -1,0 +1,2 @@
+class WrongPowerTypeError(Exception):
+    pass
