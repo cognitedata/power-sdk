@@ -2,7 +2,7 @@ import warnings
 from typing import *
 
 from cognite.client.data_classes import Asset, AssetList, AssetUpdate
-from cognite.power.exceptions import WrongPowerTypeError
+from cognite.power.exceptions import WrongPowerTypeError, assert_single_result
 
 
 class PowerAsset(Asset):
@@ -69,7 +69,7 @@ class PowerAsset(Asset):
         """Shortcut for finding the associated Terminal for a Substation, PowerTransformerEnd, or SynchronousMachine"""
         if self.type not in ["Substation", "PowerTransformerEnd", "SynchronousMachine"]:
             raise WrongPowerTypeError("A PowerAsset of type {} does not have a Terminal".format(self.type))
-        return self.relationship_sources("Terminal", relationship_type="connectsTo")[0]
+        return assert_single_result(self.relationship_sources("Terminal", relationship_type="connectsTo"))
 
     def analogs(self):
         """Shortcut for finding the associated Analogs for a Terminal (or any PowerAsset which has a Terminal)"""
@@ -81,17 +81,24 @@ class PowerAsset(Asset):
         """Shortcut for finding the associated PowerTransformerEnd for a PowerTransformer"""
         if self.type not in ["PowerTransformer"]:
             raise WrongPowerTypeError("A PowerAsset of type {} does not have a PowerTransformerEnd".format(self.type))
-        return self.relationship_targets("PowerTransformerEnd")[0]
+        return assert_single_result(self.relationship_targets("PowerTransformerEnd"))
+
+    def generator(self):
+        if self.type != "SynchronousMachine":
+            raise WrongPowerTypeError(
+                "Can only find the power generator for a SynchronousMachine, not for a  {}.".format(self.type)
+            )
+        return assert_single_result([a for a in self.relationship_sources() if "Generator" in a.type])
 
     def substation(self):
         """Shortcut for finding the associated transformer for a PowerTransformer, PowerTransformerEnd, .."""
         if self.type == "PowerTransformerEnd":
-            return self.relationship_sources("PowerTransformer")[0].substation()
+            return assert_single_result(self.relationship_sources("PowerTransformer")).substation()
         if self.type == "SynchronousMachine":
             return self.generator().substation()
         # if self.type != ["PowerTransformer"] and not slef.:
         #    raise WrongPowerTypeError("A PowerAsset of type {} does not have a substation".format(self.type))
-        return self.relationship_sources("Substation")[0]
+        return assert_single_result(self.relationship_sources("Substation"))
 
     def line_segments(self):
         """Shortcut for finding the connected ACLineSegments for a substation"""
@@ -107,6 +114,10 @@ class PowerAsset(Asset):
             )
         return self.relationship_targets("Terminal", relationship_type="connectsTo")
 
+    @staticmethod
+    def _load_from_asset(asset, cognite_client):
+        return PowerAsset(cognite_client=cognite_client, **asset.dump())
+
 
 class PowerAssetList(AssetList):
     _RESOURCE = PowerAsset
@@ -118,5 +129,5 @@ class PowerAssetList(AssetList):
     @staticmethod
     def _load_assets(assets, cognite_client):
         return PowerAssetList(
-            [PowerAsset(cognite_client=cognite_client, **a.dump()) for a in assets], cognite_client=cognite_client
+            [PowerAsset._load_from_asset(a, cognite_client) for a in assets], cognite_client=cognite_client
         )
