@@ -30,6 +30,8 @@ envlist = py36,py37,py38
 deps =
     pytest
     pytest-cov
+    cognite-sdk
+    pandas
 
 commands =
     pytest tests --cov-report xml:coverage.xml --cov=cognite
