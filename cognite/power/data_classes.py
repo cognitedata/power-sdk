@@ -65,25 +65,25 @@ class PowerAsset(Asset):
             assets = [a for a in assets if (a.metadata or {}).get("type") == power_type]
         return PowerAssetList._load_assets(assets, cognite_client=self._cognite_client)
 
-    def terminal(self):
+    def terminals(self):
         """Shortcut for finding the associated Terminal for a Substation, PowerTransformerEnd, or SynchronousMachine"""
         if self.type == "PowerTransformer":
-            return self.transformer_end().terminal()
+            return self.transformer_ends().terminals()
         if self.type not in ["Substation", "PowerTransformerEnd", "SynchronousMachine"]:
-            raise WrongPowerTypeError("A PowerAsset of type {} does not have a Terminal".format(self.type))
-        return assert_single_result(self.relationship_sources("Terminal"))
+            raise WrongPowerTypeError("A PowerAsset of type {} does not have Terminals".format(self.type))
+        return self.relationship_sources("Terminal")
 
     def analogs(self):
         """Shortcut for finding the associated Analogs for a Terminal (or any PowerAsset which has a Terminal)"""
         if self.type != "Terminal":
-            return self.terminal().analogs()
+            return self.terminals().analogs()
         return self.relationship_sources("Analog")
 
-    def transformer_end(self):
+    def transformer_ends(self):
         """Shortcut for finding the associated PowerTransformerEnd for a PowerTransformer"""
         if self.type not in ["PowerTransformer"]:
             raise WrongPowerTypeError("A PowerAsset of type {} does not have a PowerTransformerEnd".format(self.type))
-        return assert_single_result(self.relationship_targets("PowerTransformerEnd"))
+        return self.relationship_sources("PowerTransformerEnd")
 
     def generator(self):
         if self.type != "SynchronousMachine":
@@ -112,7 +112,7 @@ class PowerAsset(Asset):
     def line_segments(self):
         """Shortcut for finding the connected ACLineSegments for a substation (or associated terminal)"""
         if self.type == "Substation":
-            return self.terminal().line_segments()
+            return self.terminals().line_segments()
         if self.type != "Terminal":
             raise WrongPowerTypeError("Can only find the lines for a substation, not for a  {}.".format(self.type))
         return self.relationship_targets("ACLineSegment", relationship_type="connectsTo")
@@ -127,7 +127,7 @@ class PowerAsset(Asset):
 
     def time_series(self):
         if self.type != "Terminal":
-            return self.terminal().time_series()
+            return self.terminals().time_series()
         return super().time_series()
 
     @staticmethod
@@ -153,3 +153,9 @@ class PowerAssetList(AssetList):
 
     def line_segments(self):
         return PowerAssetList(sum([asset.line_segments() for asset in self.data], []))
+
+    def terminals(self):
+        return PowerAssetList(sum([asset.terminals() for asset in self.data], []))
+
+    def analogs(self):
+        return PowerAssetList(sum([asset.analogs() for asset in self.data], []))
