@@ -39,6 +39,7 @@ commands =
 
 [tool.poetry.dependencies]
 python = "^3.6"
+cognite-sdk = "^1.4.10"
 
 [tool.poetry.dev-dependencies]
 black = "^19.3b0"
