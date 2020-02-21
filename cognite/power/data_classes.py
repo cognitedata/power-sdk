@@ -92,6 +92,13 @@ class PowerAsset(Asset):
             )
         return assert_single_result([a for a in self.relationship_sources() if "Generator" in a.type])
 
+    def transformers(self):
+        if self.type != "Substation":
+            raise WrongPowerTypeError(
+                "Can only find the transformers for a substation, not for a  {}.".format(self.type)
+            )
+        return self.relationship_sources("PowerTransformer")
+
     def substation(self):
         """Shortcut for finding the associated transformer for a PowerTransformer, PowerTransformerEnd, .."""
         if self.type == "PowerTransformerEnd":
@@ -140,3 +147,9 @@ class PowerAssetList(AssetList):
         return PowerAssetList(
             [PowerAsset._load_from_asset(a, cognite_client) for a in assets], cognite_client=cognite_client
         )
+
+    def transformers(self):
+        return PowerAssetList(sum([asset.transformers() for asset in self.data], []))
+
+    def line_segments(self):
+        return PowerAssetList(sum([asset.line_segments() for asset in self.data], []))
