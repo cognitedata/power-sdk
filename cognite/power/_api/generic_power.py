@@ -1,3 +1,4 @@
+import math
 from typing import *
 
 from cognite.client._api.assets import AssetsAPI
@@ -35,7 +36,11 @@ class GenericPowerAPI(AssetsAPI):
             filters["metadata"]["Equipment.gridType"] = grid_type
         assets = super().list(asset_subtree_ids=subtree_ids, limit=limit, **filters)
         if base_voltage:
-            assets = [a for a in assets if int((a.metadata or {}).get("BaseVoltage")) in base_voltage]
+            assets = [
+                a
+                for a in assets
+                if float((a.metadata or {}).get("BaseVoltage_nominalVoltage", math.nan)) in base_voltage
+            ]
         return PowerAssetList._load_assets(assets, cognite_client=self._cognite_client)
 
     def retrieve_name(self, name):
