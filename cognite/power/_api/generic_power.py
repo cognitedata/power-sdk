@@ -10,9 +10,14 @@ class GenericPowerAPI(AssetsAPI):
         super().__init__(config, api_version, cognite_client)
         self.metadata_filter = metadata_filter
 
-    def list(self, limit=None, **filters):
+    def list(self, grid_type: str = None, base_voltage: Iterable = None, limit: int = None, **filters):
         filters["metadata"] = {**filters.get("metadata", {}), **self.metadata_filter}
-        return PowerAssetList._load_assets(super().list(limit=limit, **filters), cognite_client=self._cognite_client)
+        if grid_type:
+            filters["metadata"]["Equipment.gridType"] = grid_type
+        assets = super().list(limit=limit, **filters)
+        if base_voltage:
+            assets = [a for a in assets if int((a.metadata or {}).get("BaseVoltage")) in base_voltage]
+        return PowerAssetList._load_assets(assets, cognite_client=self._cognite_client)
 
     def retrieve_name(self, name):
         result = assert_single_result(super().list(name=name, metadata=self.metadata_filter))

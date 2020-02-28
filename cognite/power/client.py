@@ -24,9 +24,20 @@ class PowerClient(CogniteClient):
         **kwargs,
     ):
         super().__init__(project=project, base_url=base_url, client_name=client_name, *args, **kwargs)
+
         self.ac_line_segments = GenericPowerAPI({"type": "ACLineSegment"}, self.config, self._API_VERSION, self)
+        self.hydro_generating_units = GenericPowerAPI(
+            {"type": "HydroGeneratingUnit"}, self.config, self._API_VERSION, self
+        )
+        self.power_transformers = GenericPowerAPI({"type": "PowerTransformer"}, self.config, self._API_VERSION, self)
+        self.power_transformer_ends = GenericPowerAPI(
+            {"type": "PowerTransformerEnd"}, self.config, self._API_VERSION, self
+        )
         self.substations = GenericPowerAPI({"type": "Substation"}, self.config, self._API_VERSION, self)
-        self.transformers = GenericPowerAPI({"type": "PowerTransformer"}, self.config, self._API_VERSION, self)
-        self.transformer_ends = GenericPowerAPI({"type": "PowerTransformerEnd"}, self.config, self._API_VERSION, self)
-        self.sync_machines = GenericPowerAPI({"type": "SynchronousMachines"}, self.config, self._API_VERSION, self)
+        self.synchronous_machines = GenericPowerAPI(
+            {"type": "SynchronousMachines"}, self.config, self._API_VERSION, self
+        )
         self.terminals = GenericPowerAPI({"type": "Terminal"}, self.config, self._API_VERSION, self)
+        self.wind_generating_units = GenericPowerAPI(
+            {"type": "WindGeneratingUnit"}, self.config, self._API_VERSION, self
+        )

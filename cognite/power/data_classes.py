@@ -1,7 +1,8 @@
 import warnings
 from typing import *
 
-from cognite.client.data_classes import Asset, AssetList, AssetUpdate
+from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList
+from cognite.client.utils._concurrency import execute_tasks_concurrently
 from cognite.power.exceptions import WrongPowerTypeError, assert_single_result
 
 
@@ -65,13 +66,13 @@ class PowerAsset(Asset):
             assets = [a for a in assets if (a.metadata or {}).get("type") == power_type]
         return PowerAssetList._load_assets(assets, cognite_client=self._cognite_client)
 
-    def terminals(self):
-        """Shortcut for finding the associated Terminal for a Substation, PowerTransformerEnd, or SynchronousMachine"""
-        if self.type == "PowerTransformer":
-            return self.transformer_ends().terminals()
-        if self.type not in ["Substation", "PowerTransformerEnd", "SynchronousMachine"]:
-            raise WrongPowerTypeError("A PowerAsset of type {} does not have Terminals".format(self.type))
-        return self.relationship_sources("Terminal")
+    def ac_line_segments(self):
+        """Shortcut for finding the connected ACLineSegments for a Substation (or associated terminal)"""
+        if self.type == "Substation":
+            return self.terminals().ac_line_segments()
+        if self.type != "Terminal":
+            raise WrongPowerTypeError("Can only find the lines for a Substation, not for a  {}.".format(self.type))
+        return self.relationship_targets("ACLineSegment", relationship_type="connectsTo")
 
     def analogs(self):
         """Shortcut for finding the associated Analogs for a Terminal (or any PowerAsset which has a Terminal)"""
@@ -79,11 +80,28 @@ class PowerAsset(Asset):
             return self.terminals().analogs()
         return self.relationship_sources("Analog")
 
-    def transformer_ends(self):
+    def power_transformer_ends(self):
         """Shortcut for finding the associated PowerTransformerEnd for a PowerTransformer"""
         if self.type not in ["PowerTransformer"]:
             raise WrongPowerTypeError("A PowerAsset of type {} does not have a PowerTransformerEnd".format(self.type))
         return self.relationship_sources("PowerTransformerEnd")
+
+    def power_transformers(self):
+        if self.type != "Substation":
+            raise WrongPowerTypeError(
+                "Can only find the transformers for a substation, not for a  {}.".format(self.type)
+            )
+        return self.relationship_sources("PowerTransformer")
+
+    def terminals(self):
+        """Shortcut for finding the associated Terminal for a Substation, PowerTransformerEnd, or SynchronousMachine"""
+        if self.type == "Terminal":
+            return [self]
+        if self.type == "PowerTransformer":
+            return self.power_transformer_ends().terminals()
+        if self.type not in ["Substation", "PowerTransformerEnd", "SynchronousMachine"]:
+            raise WrongPowerTypeError("A PowerAsset of type {} does not have Terminals".format(self.type))
+        return self.relationship_sources("Terminal")
 
     def generator(self):
         if self.type != "SynchronousMachine":
@@ -91,13 +109,6 @@ class PowerAsset(Asset):
                 "Can only find the power generator for a SynchronousMachine, not for a  {}.".format(self.type)
             )
         return assert_single_result([a for a in self.relationship_sources() if "Generator" in a.type])
-
-    def transformers(self):
-        if self.type != "Substation":
-            raise WrongPowerTypeError(
-                "Can only find the transformers for a substation, not for a  {}.".format(self.type)
-            )
-        return self.relationship_sources("PowerTransformer")
 
     def substation(self):
         """Shortcut for finding the associated transformer for a PowerTransformer, PowerTransformerEnd, .."""
@@ -109,14 +120,6 @@ class PowerAsset(Asset):
         #    raise WrongPowerTypeError("A PowerAsset of type {} does not have a substation".format(self.type))
         return assert_single_result(self.relationship_targets("Substation"))
 
-    def line_segments(self):
-        """Shortcut for finding the connected ACLineSegments for a substation (or associated terminal)"""
-        if self.type == "Substation":
-            return self.terminals().line_segments()
-        if self.type != "Terminal":
-            raise WrongPowerTypeError("Can only find the lines for a substation, not for a  {}.".format(self.type))
-        return self.relationship_targets("ACLineSegment", relationship_type="connectsTo")
-
     def connected_terminals(self):
         """Shortcut for finding the connected Terminals for an ACLineSegment"""
         if self.type != "ACLineSegment":
@@ -125,10 +128,10 @@ class PowerAsset(Asset):
             )
         return self.relationship_sources("Terminal", relationship_type="connectsTo")
 
-    def time_series(self):
-        if self.type != "Terminal":
-            return self.terminals().time_series()
-        return super().time_series()
+    def time_series(self, measurement_type=None, timeseries_type=None, **kwargs):
+        metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
+        metadata_filter = {k: v for k, v in metadata_filter.items() if v}
+        return self._cognite_client.time_series.list(asset_subtree_ids=[self.id], metadata=metadata_filter)
 
     @staticmethod
     def _load_from_asset(asset, cognite_client):
@@ -148,14 +151,26 @@ class PowerAssetList(AssetList):
             [PowerAsset._load_from_asset(a, cognite_client) for a in assets], cognite_client=cognite_client
         )
 
-    def transformers(self):
-        return PowerAssetList(sum([asset.transformers() for asset in self.data], []))
+    def power_transformers(self):
+        return PowerAssetList(sum([asset.power_transformers() for asset in self.data], []))
 
-    def line_segments(self):
-        return PowerAssetList(sum([asset.line_segments() for asset in self.data], []))
+    def ac_line_segments(self):
+        return PowerAssetList(sum([asset.ac_line_segments() for asset in self.data], []))
 
     def terminals(self):
         return PowerAssetList(sum([asset.terminals() for asset in self.data], []))
 
     def analogs(self):
         return PowerAssetList(sum([asset.analogs() for asset in self.data], []))
+
+    def time_series(self, measurement_type=None, timeseries_type=None, **kwargs):
+        metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
+        metadata_filter = {k: v for k, v in metadata_filter.items() if v}
+        chunk_size = 100
+        ids = [a.id for a in self.data]
+        tasks = [
+            {"asset_subtree_ids": ids[i : i + self._retrieve_chunk_size], "metadata": metadata_filter}
+            for i in range(0, len(ids), chunk_size)
+        ]
+        res_list = execute_tasks_concurrently(self._cognite_client.time_series.list, tasks, max_workers=10)
+        return TimeSeriesList(sum(res_list.joined_results(), []))
