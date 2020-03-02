@@ -8,10 +8,12 @@ class PowerClient(CogniteClient):
     In addition to all functionality from the basic and experimental Cognite Python SDK, includes:
     * `.ac_line_segments`
     * `.substations`
-    * `.transformers`
-    * `.transformer_ends`
-    * `.sync_machines`
+    * `.synchronous_machines`
+    * `.hydro_generating_units`, `.wind_generating_units`
+    * `.power_transformers`
+    * `.power_transformer_ends`
     * `.terminals`
+    * `.analogs`
     Each of which has a `list` function which returns the specific assets only. See documentation for GenericPowerAPI for details.
     """
 
@@ -25,19 +27,22 @@ class PowerClient(CogniteClient):
     ):
         super().__init__(project=project, base_url=base_url, client_name=client_name, *args, **kwargs)
 
-        self.ac_line_segments = GenericPowerAPI({"type": "ACLineSegment"}, self.config, self._API_VERSION, self)
-        self.hydro_generating_units = GenericPowerAPI(
-            {"type": "HydroGeneratingUnit"}, self.config, self._API_VERSION, self
-        )
-        self.power_transformers = GenericPowerAPI({"type": "PowerTransformer"}, self.config, self._API_VERSION, self)
+        self.ac_line_segments = GenericPowerAPI("ACLineSegment", self.config, self._API_VERSION, self)
+        self.substations = GenericPowerAPI("Substation", self.config, self._API_VERSION, self)
+        self.synchronous_machines = GenericPowerAPI("SynchronousMachine", self.config, self._API_VERSION, self)
+
+        self.hydro_generating_units = GenericPowerAPI("HydroGeneratingUnit", self.config, self._API_VERSION, self)
+        self.wind_generating_units = GenericPowerAPI("WindGeneratingUnit", self.config, self._API_VERSION, self)
+
+        self.power_transformers = GenericPowerAPI("PowerTransformer", self.config, self._API_VERSION, self)
         self.power_transformer_ends = GenericPowerAPI(
-            {"type": "PowerTransformerEnd"}, self.config, self._API_VERSION, self
+            "PowerTransformerEnd", self.config, self._API_VERSION, self, grid_type_field="TransformerEnd.gridType"
         )
-        self.substations = GenericPowerAPI({"type": "Substation"}, self.config, self._API_VERSION, self)
-        self.synchronous_machines = GenericPowerAPI(
-            {"type": "SynchronousMachines"}, self.config, self._API_VERSION, self
-        )
-        self.terminals = GenericPowerAPI({"type": "Terminal"}, self.config, self._API_VERSION, self)
-        self.wind_generating_units = GenericPowerAPI(
-            {"type": "WindGeneratingUnit"}, self.config, self._API_VERSION, self
-        )
+
+        self.terminals = GenericPowerAPI("Terminal", self.config, self._API_VERSION, self)
+        self.analogs = GenericPowerAPI("Analog", self.config, self._API_VERSION, self)
+
+
+#        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
+#        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
+#        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
