@@ -2,47 +2,146 @@ import math
 from typing import *
 
 from cognite.client._api.assets import AssetsAPI
-from cognite.power.data_classes import PowerAsset, PowerAssetList
+from cognite.power.data_classes import *
+from cognite.power.data_classes import _str_to_class
 from cognite.power.exceptions import assert_single_result
 
 
 class GenericPowerAPI(AssetsAPI):
-    def __init__(self, metadata_filter, config, api_version, cognite_client):
+    def __init__(self, power_type, config, api_version, cognite_client, grid_type_field="Equipment.gridType"):
+        self.power_type = power_type
+        if power_type:
+            assert _str_to_class(self.power_type) is not None
+            self.grid_type_field_name = grid_type_field
         super().__init__(config, api_version, cognite_client)
-        self.metadata_filter = metadata_filter
 
-    def _all_bidding_areas(self):
+    def _all_bidding_area(self):
         return self._cognite_client.assets.list(metadata={"type": "BiddingArea"})
+
+    def _create_filter(
+        self,
+        grid_type: str = None,
+        bidding_area: Union[str, List[str]] = None,
+        asset_type: Union[str, List[str]] = None,
+        wrap_ids=False,
+        **filters,
+    ) -> Dict:
+        if bidding_area:
+            if isinstance(bidding_area, str):
+                bidding_area = [bidding_area]
+            subtree_assets = [a for a in self._all_bidding_area() if a.name in bidding_area]
+            found_names = [a.name for a in subtree_assets]
+            not_found = set(bidding_area) - set(found_names)
+            if not_found:
+                raise ValueError(f"Bidding area(s) {not_found} not found")
+            if wrap_ids:
+                filters["asset_subtree_ids"] = [{"id": a.id} for a in subtree_assets]
+            else:
+                filters["asset_subtree_ids"] = [a.id for a in subtree_assets]
+        if "metadata" not in filters:
+            filters["metadata"] = {}
+        asset_type = asset_type or self.power_type
+        if asset_type:
+            filters["metadata"]["type"] = asset_type
+        if grid_type:
+            filters["metadata"][self.grid_type_field_name] = grid_type
+        return filters
 
     def list(
         self,
         grid_type: str = None,
         base_voltage: Iterable = None,
-        bidding_areas: list = None,
+        bidding_area: Union[str, List[str]] = None,
+        asset_type: Union[str, List[str]] = None,
         limit: int = None,
-        **filters,
-    ):
-        if bidding_areas:
-            subtree_assets = [a for a in self._all_bidding_areas() if a.name in bidding_areas]
-            found_names = [a.name for a in subtree_assets]
-            not_found = set(bidding_areas) - set(found_names)
-            if not_found:
-                raise ValueError(f"Bidding area(s) {not_found} not found")
-            subtree_ids = [a.id for a in subtree_assets]
-        else:
-            subtree_ids = None
-        filters["metadata"] = {**filters.get("metadata", {}), **self.metadata_filter}
-        if grid_type:
-            filters["metadata"]["Equipment.gridType"] = grid_type
-        assets = super().list(asset_subtree_ids=subtree_ids, limit=limit, **filters)
-        if base_voltage:
-            assets = [
-                a
-                for a in assets
-                if float((a.metadata or {}).get("BaseVoltage_nominalVoltage", math.nan)) in base_voltage
-            ]
-        return PowerAssetList._load_assets(assets, cognite_client=self._cognite_client)
+        **kwargs,
+    ) -> PowerAssetList:
+        """Lists power assets. Supports all parameters as the normal list function in addition to some power specific ones.
 
-    def retrieve_name(self, name):
-        result = assert_single_result(super().list(name=name, metadata=self.metadata_filter))
-        return PowerAsset._load_from_asset(result, self._cognite_client)
+        Args:
+            grid_type: filters on Equipment.gridType
+            base_voltage: filters on BaseVoltage_nominalVoltage in the given range or list.
+            bidding_area: filters on assets being in the bidding areas with this name.
+            kwargs: all other parameters for the normal AssetsAPI.list method
+            asset_type: filter on these asset types. Automatically populated for specific APIs
+        """
+        if self.power_type and asset_type:
+            raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
+        if isinstance(asset_type, list):
+            asset_lists = [
+                self.list(asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type)
+                for type in asset_type
+            ]
+            return PowerAssetList._load_assets(
+                sum(asset_lists, []),
+                asset_type[0] if len(asset_type) == 1 else None,  # mixed
+                base_voltage=base_voltage,
+                cognite_client=self._cognite_client,
+            )
+        filters = self._create_filter(bidding_area=bidding_area, grid_type=grid_type, asset_type=asset_type, **kwargs)
+
+        assets = super().list(limit=limit, **filters)
+        return PowerAssetList._load_assets(
+            assets,
+            filters.get("metadata", {}).get("type"),
+            base_voltage=base_voltage,
+            cognite_client=self._cognite_client,
+        )
+
+    def search(
+        self,
+        grid_type: str = None,
+        base_voltage: Iterable = None,
+        bidding_area: Union[str, List[str]] = None,
+        asset_type: Union[str, List[str]] = None,
+        limit: int = None,
+        **kwargs,
+    ) -> PowerAssetList:
+        """Search power assets. Supports all parameters as the normal search function in addition to some power specific ones.
+
+        Args:
+            grid_type: filters on Equipment.gridType
+            base_voltage: filters on BaseVoltage_nominalVoltage in the given range or list.
+            bidding_area: filters on assets being in the bidding areas with this name.
+            filters: all other parameters for the normal AssetsAPI.list method
+            asset_type: filter on these asset types. Automatically populated for specific APIs
+        """
+        if self.power_type and asset_type:
+            raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
+        if isinstance(asset_type, list):
+            asset_lists = [
+                self.search(asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type)
+                for type in asset_type
+            ]
+            return PowerAssetList._load_assets(
+                sum(asset_lists, []),
+                asset_type[0] if len(asset_type) == 1 else None,  # mixed
+                base_voltage=base_voltage,
+                cognite_client=self._cognite_client,
+            )
+
+        filter = self._create_filter(
+            bidding_area=bidding_area,
+            grid_type=grid_type,
+            asset_type=asset_type,
+            wrap_ids=True,
+            **kwargs.get("filter", {}),
+        )
+        if "filter" in kwargs:
+            del kwargs["filter"]
+
+        assets = super().search(limit=limit, filter=filter, **kwargs)
+        return PowerAssetList._load_assets(
+            assets,
+            filter.get("metadata", {}).get("type"),
+            base_voltage=base_voltage,
+            cognite_client=self._cognite_client,
+        )
+
+    def retrieve_name(
+        self, name: str, asset_type: str = None, bidding_area: Union[str, List[str]] = None
+    ) -> PowerAsset:
+        """Retrieve a single asset by exact name match. Fails if not exactly one asset is found."""
+        filters = self._create_filter(asset_type=asset_type, bidding_area=bidding_area)
+        result = assert_single_result(super().list(name=name, **filters))
+        return PowerAsset._load_from_asset(result, self.power_type or asset_type, self._cognite_client)
