@@ -42,6 +42,8 @@ class PowerClient(CogniteClient):
         self.terminals = GenericPowerAPI("Terminal", self.config, self._API_VERSION, self)
         self.analogs = GenericPowerAPI("Analog", self.config, self._API_VERSION, self)
 
+        self.power_assets = GenericPowerAPI(None, self.config, self._API_VERSION, self)
+
 
 #        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
 #        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
