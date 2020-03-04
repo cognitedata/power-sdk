@@ -26,6 +26,7 @@ class GenericPowerAPI(AssetsAPI):
         wrap_ids=False,
         **filters,
     ) -> Dict:
+
         if bidding_area:
             if isinstance(bidding_area, str):
                 bidding_area = [bidding_area]
@@ -69,7 +70,9 @@ class GenericPowerAPI(AssetsAPI):
             raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
         if isinstance(asset_type, list):
             asset_lists = [
-                self.list(asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type)
+                self.list(
+                    asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type, **kwargs
+                )
                 for type in asset_type
             ]
             return PowerAssetList._load_assets(
@@ -110,7 +113,9 @@ class GenericPowerAPI(AssetsAPI):
             raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
         if isinstance(asset_type, list):
             asset_lists = [
-                self.search(asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type)
+                self.search(
+                    asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type, **kwargs
+                )
                 for type in asset_type
             ]
             return PowerAssetList._load_assets(
