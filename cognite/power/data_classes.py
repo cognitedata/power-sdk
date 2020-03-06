@@ -136,7 +136,6 @@ class PowerTransformer(PowerAsset):
         Args:
             end_number: filter on transformer end number
         """
-        print("PTE called", end_number)
         if end_number is not None:
             if not isinstance(end_number, Iterable):
                 end_number = [end_number]
