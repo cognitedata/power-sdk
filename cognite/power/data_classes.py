@@ -136,6 +136,7 @@ class PowerTransformer(PowerAsset):
         Args:
             end_number: filter on transformer end number
         """
+        print("PTE called", end_number)
         if end_number is not None:
             if not isinstance(end_number, Iterable):
                 end_number = [end_number]
@@ -192,7 +193,7 @@ class PowerTransformerEnd(PowerAsset):
         end_number = self.end_number
         if end_number not in [1, 2]:
             raise ValueError(f"Can't get opposite end for list with end number {end_number}, should be all 1 or all 2")
-        opposite_end_number = 1 if end_number == 2 else 1
+        opposite_end_number = 1 if end_number == 2 else 2
         return assert_single_result(self.power_transformer().power_transformer_ends(end_number=opposite_end_number))
 
 
@@ -399,7 +400,7 @@ class PowerAssetList(AssetList):
                 raise ValueError(
                     f"Can't get opposite end for list with end number(s) {end_numbers}, should be either all 1 or all 2"
                 )
-            opposite_end_number = 1 if list(end_numbers)[0] == 2 else 1
+            opposite_end_number = 1 if list(end_numbers)[0] == 2 else 2
             return self.power_transformers().power_transformer_ends(end_number=opposite_end_number)
         else:
             raise ValueError(f"Can't get substations for a list of {self.type}")
