@@ -165,7 +165,7 @@ class Substation(PowerAsset):
 
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
         filter = self._sequence_number_filter(sequence_number)
-        return self.power_transformer_ends().terminals(sequence_number=sequence_number, x_filter=filter)
+        return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
     def ac_line_segments(self, base_voltage: Iterable = None):
         return self.terminals().ac_line_segments(base_voltage=base_voltage)
