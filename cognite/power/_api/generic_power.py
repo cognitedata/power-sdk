@@ -144,9 +144,14 @@ class GenericPowerAPI(AssetsAPI):
         )
 
     def retrieve_name(
-        self, name: str, asset_type: str = None, bidding_area: Union[str, List[str]] = None
+        self, name: Union[List[str], str], asset_type: str = None, bidding_area: Union[str, List[str]] = None
     ) -> PowerAsset:
-        """Retrieve a single asset by exact name match. Fails if not exactly one asset is found."""
-        filters = self._create_filter(asset_type=asset_type, bidding_area=bidding_area)
-        result = assert_single_result(super().list(name=name, **filters))
-        return PowerAsset._load_from_asset(result, self.power_type or asset_type, self._cognite_client)
+        """Retrieve one or more assets by exact name match. Fails if not exactly one asset is found."""
+        if isinstance(name, str):
+            filters = self._create_filter(asset_type=asset_type, bidding_area=bidding_area)
+            result = assert_single_result(super().list(name=name, **filters))
+            return PowerAsset._load_from_asset(result, self.power_type or asset_type, self._cognite_client)
+        else:
+            return PowerAssetList(
+                [self.retrieve_name(name=n, asset_type=asset_type, bidding_area=bidding_area) for n in name]
+            )

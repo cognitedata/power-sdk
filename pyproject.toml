@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cognite-power-sdk"
-version = "0.4.2"
+version = "0.4.5"
 description = "Cognite Power SDK"
 authors = ["Sander Land <sander.land@cognite.com>"]
 
@@ -18,7 +18,7 @@ line_length=120                # corresponds to -w  flag
 multi_line_output=3            # corresponds to -m  flag
 include_trailing_comma=true    # corresponds to -tc flag
 skip_glob = '^((?!py$).)*$'    # this makes sort all Python files
-known_third_party = ["numpy", "pytest"]
+known_third_party = ["numpy", "pandas", "pytest"]
 
 [tool.tox]
 legacy_tox_ini = """
