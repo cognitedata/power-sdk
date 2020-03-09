@@ -1,13 +1,19 @@
 import math
 import sys
 import warnings
+from collections import defaultdict
 from typing import *
 
 import numpy as np
 
 from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList
 from cognite.client.utils._concurrency import execute_tasks_concurrently
-from cognite.power.exceptions import SinglePowerAssetExpected, WrongPowerTypeError, assert_single_result
+from cognite.power.exceptions import (
+    MixedPowerAssetListException,
+    SinglePowerAssetExpected,
+    WrongPowerTypeError,
+    assert_single_result,
+)
 
 
 def _str_to_class(classname):
@@ -270,14 +276,25 @@ class PowerAssetList(AssetList):
             return None
         types = list({a.type for a in self.data})
         if len(types) != 1:
-            raise Exception(f"Can not determine type of list with assets of types {', '.join(types)}")
+            raise MixedPowerAssetListException(
+                f"Can not determine type of list with assets of types {', '.join(types)}"
+            )
         return types[0]
 
     def has_type(self, check_type):
         return self.type == check_type
 
+    def split_by_type(self) -> Dict[str, "PowerAssetList"]:
+        """Returns a dictionary of asset type-> list of assets"""
+        type_to_assets = defaultdict(lambda: PowerAssetList([], cognite_client=self._cognite_client))
+        for asset in self.data:
+            type_to_assets[asset.type].append(asset)
+        return type_to_assets
+
     @staticmethod
-    def _load_assets(assets, class_name, cognite_client, base_voltage: Iterable = None, x_filter: Callable = None):
+    def _load_assets(
+        assets, class_name, cognite_client, base_voltage: Iterable = None, x_filter: Callable = None
+    ) -> "PowerAssetList":
         power_assets = [PowerAsset._load_from_asset(a, class_name, cognite_client) for a in assets]
         if x_filter:
             power_assets = [a for a in power_assets if x_filter(a)]
@@ -398,8 +415,14 @@ class PowerAssetList(AssetList):
 
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
         """Shortcut for finding the associated Terminals. For a power transformer list, will retrieve all terminals via terminal ends of the specified end_number(s)"""
-        if self.has_type("PowerTransformer"):
-            return self.power_transformer_ends().terminals(sequence_number=sequence_number)
+        try:
+            if self.has_type("PowerTransformer"):
+                return self.power_transformer_ends().terminals(sequence_number=sequence_number)
+        except MixedPowerAssetListException:
+            return PowerAssetList(
+                sum([assets.terminals() for _type, assets in self.split_by_type().items()], []),
+                cognite_client=self._cognite_client,
+            )
         filter = PowerAsset._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
