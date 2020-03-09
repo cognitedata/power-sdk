@@ -1,23 +1,52 @@
+from collections import UserList
 from typing import *
 
+import numpy as np
 import pandas as pd
 
 from cognite.client.data_classes._base import CogniteResourceList
+from cognite.client.utils._time import granularity_to_ms
 from cognite.power.data_classes import PowerAsset, PowerAssetList
+from cognite.power.exceptions import assert_single_result
 
 
 class PowerCorridorComponent:
-    def __init__(self, asset: PowerAsset, sequence_number, fraction=1.0):
+    def __init__(
+        self,
+        asset: PowerAsset,
+        sequence_number,
+        fraction=1.0,
+        measurement_type="ThreePhaseActivePower",
+        timeseries_type="estimated_value",
+    ):
         self.asset = asset
         self.sequence_number = sequence_number
         self.fraction = fraction
+        self.measurement_type = measurement_type
+        self.timeseries_type = timeseries_type
 
     def dump(self, *args, **kwargs):
         return {
             "asset": f"{self.asset.__class__.__name__}: {self.asset.name}",
-            "fraction": self.fraction,
             "sequence_number": self.sequence_number,
+            "fraction": self.fraction,
+            "measurement_type": self.measurement_type,
+            "timeseries_type": self.timeseries_type,
         }
+
+    def terminal(self):
+        term = [self.asset.terminals(sequence_number=self.sequence_number)]
+        return assert_single_result(
+            term,
+            f"Expected a single terminal with sequence number {self.sequence_number} for {self.asset.name}, but found {len(term)}",
+        )
+
+    def time_series(self):
+        term = self.terminal().time_series(measurement_type=self.measurement_type, timeseries_type=self.timeseries_type)
+        return assert_single_result(
+            term,
+            f"Expected a single time series with measurement type {self.measurement_type} and timeseries type {self.timeseries_type} for {self.asset.name}, but found {len(term)}",
+        )
 
 
 class PowerCorridor(CogniteResourceList):
@@ -25,6 +54,9 @@ class PowerCorridor(CogniteResourceList):
     _ASSERT_CLASSES = False
 
     def __init__(self, items: List[PowerCorridorComponent], cognite_client=None):
+        """Power Corridor class. When cognite_client is ommitted, it is taken from the first asset given."""
+        if not cognite_client and items:
+            cognite_client = items[0].asset._cognite_client
         super().__init__(items, cognite_client=cognite_client)
         self.assets = PowerAssetList([a.asset for a in items])
         assert self.assets.type  # exists/is homogeneous
@@ -33,32 +65,26 @@ class PowerCorridor(CogniteResourceList):
     def fractions(self):
         return [pci.fraction for pci in self.data]
 
-    def terminals(self):
-        ts = [pci.asset.terminals(sequence_number=pci.sequence_number) for pci in self.data]
-        unwrapped = []
-        for t in ts:
-            assert len(t) == 1
-            unwrapped.append(t)
-        return PowerAssetList(t)
-
-    def time_series(self, measurement_type="ThreePhaseActivePower", timeseries_type="estimated_value"):
-        ts = [t.time_series() for t in self.terminals()]
-        unwrapped = []
-        for t in ts:
-            assert len(t) == 1
-            unwrapped.append(t)
-        return unwrapped
-
-    def retrieve_dataframe(
-        self,
-        measurement_type="ThreePhaseActivePower",
-        timeseries_type="estimated_value",
-        thresholds: Dict = None,
-        aggregates=None,
-        **kwargs,
+    def calculate(
+        self, start, aggregates=("average", "max"), granularity="10m", end="now", thresholds: Dict = None,
     ):
-        ts = self.terminals().time_series(measurement_type=measurement_type, timeseries_type=timeseries_type)
-        dfd = self._cognite_client.retrieve_dataframe_dict(aggregates=aggregates, **kwargs)
-        ret = pd.DataFrame()
+        """Calculates a dataframe for a PowerCorridor. The results are approximated as sums of aggregates."""
+        ts = [pci.time_series() for pci in self.data]
+        dfd = self._cognite_client.datapoints.retrieve_dataframe_dict(
+            id=[t.id for t in ts], start=start, end=end, granularity=granularity, aggregates=list(aggregates)
+        )
+        snitt = pd.DataFrame()
         for k, v in dfd.items():
-            ret[k] = pd.sum(v * f for v, f in zip(v, self.fractions))
+            scaled_ts = [col * frac for (colname, col), frac in zip(dfd[k].items(), self.fractions)]
+            snitt[k] = pd.concat(scaled_ts, axis=1).dropna().sum(axis=1)
+        snitt = snitt.reindex(
+            np.arange(
+                snitt.index[0],
+                snitt.index[-1] + pd.Timedelta(microseconds=1),
+                pd.Timedelta(microseconds=granularity_to_ms(granularity) * 1000),
+            ),
+            copy=False,
+        )
+        for k, v in (thresholds or {}).items():
+            snitt[k] = v
+        return snitt

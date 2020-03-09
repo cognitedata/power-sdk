@@ -2,8 +2,7 @@ import math
 from typing import *
 
 from cognite.client._api.assets import AssetsAPI
-from cognite.power.data_classes import *
-from cognite.power.data_classes import _str_to_class
+from cognite.power.data_classes import PowerAsset, PowerAssetList, _str_to_class
 from cognite.power.exceptions import assert_single_result
 
 
@@ -145,7 +144,7 @@ class GenericPowerAPI(AssetsAPI):
 
     def retrieve_name(
         self, name: Union[List[str], str], asset_type: str = None, bidding_area: Union[str, List[str]] = None
-    ) -> PowerAsset:
+    ) -> Union[PowerAsset, PowerAssetList]:
         """Retrieve one or more assets by exact name match. Fails if not exactly one asset is found."""
         if isinstance(name, str):
             filters = self._create_filter(asset_type=asset_type, bidding_area=bidding_area)
@@ -153,5 +152,6 @@ class GenericPowerAPI(AssetsAPI):
             return PowerAsset._load_from_asset(result, self.power_type or asset_type, self._cognite_client)
         else:
             return PowerAssetList(
-                [self.retrieve_name(name=n, asset_type=asset_type, bidding_area=bidding_area) for n in name]
+                [self.retrieve_name(name=n, asset_type=asset_type, bidding_area=bidding_area) for n in name],
+                cognite_client=self._cognite_client,
             )

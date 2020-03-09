@@ -7,7 +7,7 @@ import numpy as np
 
 from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList
 from cognite.client.utils._concurrency import execute_tasks_concurrently
-from cognite.power.exceptions import WrongPowerTypeError, assert_single_result
+from cognite.power.exceptions import SinglePowerAssetExpected, WrongPowerTypeError, assert_single_result
 
 
 def _str_to_class(classname):
@@ -129,6 +129,21 @@ class Terminal(PowerAsset):
         else:
             return None
 
+    def opposite_end(self) -> "Terminal":
+        seq_number = self.sequence_number
+        if seq_number not in [1, 2]:
+            raise ValueError(f"Can't get opposite end for terminal with sequence number {seq_number}, should be 1 or 2")
+        opposite_seq_number = 1 if seq_number == 2 else 2
+
+        al = self.relationship_targets(power_type="ACLineSegment", relationship_type="connectsTo")
+        if not al:
+            al = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+        if not al:
+            raise SinglePowerAssetExpected(
+                al, f"Could not find any ACLineSegment or PowerTransformerEnd connected to terminal {self.external_id}"
+            )
+        return assert_single_result(al[0].terminals(sequence_number=opposite_seq_number))
+
 
 class Analog(PowerAsset):
     pass
@@ -194,7 +209,9 @@ class PowerTransformerEnd(PowerAsset):
     def opposite_end(self):
         end_number = self.end_number
         if end_number not in [1, 2]:
-            raise ValueError(f"Can't get opposite end for list with end number {end_number}, should be all 1 or all 2")
+            raise ValueError(
+                f"Can't get opposite end for PowerTransformerEnd with end number {end_number}, should be 1 or 2"
+            )
         opposite_end_number = 1 if end_number == 2 else 2
         return assert_single_result(self.power_transformer().power_transformer_ends(end_number=opposite_end_number))
 
@@ -399,8 +416,19 @@ class PowerAssetList(AssetList):
                 )
             opposite_end_number = 1 if list(end_numbers)[0] == 2 else 2
             return self.power_transformers().power_transformer_ends(end_number=opposite_end_number)
+        if self.has_type("Terminal"):
+            seq_numbers = {a.sequence_number for a in self.data}
+            if seq_numbers != {1} and seq_numbers != {2}:
+                raise ValueError(
+                    f"Can't get opposite end for list with sequence number(s) {seq_numbers}, should be either all 1 or all 2"
+                )
+            opposite_seq_number = 1 if list(seq_numbers)[0] == 2 else 2
+            al = self.relationship_targets(power_type="ACLineSegment", relationship_type="connectsTo")
+            if not al:
+                al = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+            return al.terminals(sequence_number=opposite_seq_number)
         else:
-            raise ValueError(f"Can't get substations for a list of {self.type}")
+            raise ValueError(f"Can't get opposite ends for a list of {self.type}")
 
     def time_series(self, measurement_type=None, timeseries_type=None, **kwargs):
         metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
