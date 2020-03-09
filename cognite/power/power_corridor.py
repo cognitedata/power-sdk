@@ -59,7 +59,6 @@ class PowerCorridor(CogniteResourceList):
             cognite_client = items[0].asset._cognite_client
         super().__init__(items, cognite_client=cognite_client)
         self.assets = PowerAssetList([a.asset for a in items])
-        assert self.assets.type  # exists/is homogeneous
 
     @property
     def fractions(self):

@@ -173,8 +173,7 @@ class PowerTransformer(PowerAsset):
         return self.relationship_sources("PowerTransformerEnd", base_voltage=base_voltage, x_filter=end_number_filter)
 
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
-        filter = self._sequence_number_filter(sequence_number)
-        return self.power_transformer_ends().terminals(sequence_number=sequence_number, x_filter=filter)
+        return self.power_transformer_ends().terminals(sequence_number=sequence_number)
 
     def substation(self):
         return assert_single_result(self.relationship_targets("Substation"))
