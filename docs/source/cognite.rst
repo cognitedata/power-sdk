@@ -1,6 +1,12 @@
 Quickstart
 ==========
 
+Create a Power Client object with:
+
+    >>> from cognite.power import PowerClient
+    >>> c = CogniteClient(api_key="<your-api-key>", project="<your project>",)
+
+Read more about the `PowerClient`_ and the functionality it exposes below.
 
 
 PowerClient
