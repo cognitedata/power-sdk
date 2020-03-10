@@ -1,4 +1,5 @@
 from collections import UserList
+from datetime import datetime
 from typing import *
 
 import numpy as np
@@ -61,12 +62,17 @@ class PowerCorridor(CogniteResourceList):
         self.assets = PowerAssetList([a.asset for a in items])
 
     @property
-    def fractions(self):
+    def fractions(self) -> List[float]:
         return [pci.fraction for pci in self.data]
 
     def calculate(
-        self, start, aggregates=("average", "max"), granularity="10m", end="now", thresholds: Dict = None,
-    ):
+        self,
+        start: Union[str, datetime],
+        end: Union[str, datetime] = "now",
+        aggregates: Iterable = ("average", "max"),
+        granularity: str = "10m",
+        thresholds: Dict[str, float] = None,
+    ) -> "pd.DataFrame":
         """Calculates a dataframe for a PowerCorridor. The results are approximated as sums of aggregates."""
         ts = [pci.time_series() for pci in self.data]
         dfd = self._cognite_client.datapoints.retrieve_dataframe_dict(

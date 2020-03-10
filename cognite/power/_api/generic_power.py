@@ -59,11 +59,14 @@ class GenericPowerAPI(AssetsAPI):
         """Lists power assets. Supports all parameters as the normal list function in addition to some power specific ones.
 
         Args:
-            grid_type: filters on Equipment.gridType
-            base_voltage: filters on BaseVoltage_nominalVoltage in the given range or list.
-            bidding_area: filters on assets being in the bidding areas with this name.
+            grid_type (str): filters on Equipment.gridType
+            base_voltage (Iterable): filters on BaseVoltage_nominalVoltage in the given range or list.
+            bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
+            asset_type (Union[str, List[str]]): filter on these asset types. Automatically populated for specific APIs
             kwargs: all other parameters for the normal AssetsAPI.list method
-            asset_type: filter on these asset types. Automatically populated for specific APIs
+
+        Returns:
+            PowerAssetList: List of the requested assets.
         """
         if self.power_type and asset_type:
             raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
@@ -102,11 +105,14 @@ class GenericPowerAPI(AssetsAPI):
         """Search power assets. Supports all parameters as the normal search function in addition to some power specific ones.
 
         Args:
-            grid_type: filters on Equipment.gridType
-            base_voltage: filters on BaseVoltage_nominalVoltage in the given range or list.
-            bidding_area: filters on assets being in the bidding areas with this name.
-            filters: all other parameters for the normal AssetsAPI.list method
-            asset_type: filter on these asset types. Automatically populated for specific APIs
+            grid_type (str): filters on Equipment.gridType
+            base_voltage (Iterable): filters on BaseVoltage_nominalVoltage in the given range or list.
+            bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
+            asset_type (Union[str, List[str]]): filter on these asset types. Automatically populated for specific APIs
+            kwargs: all other parameters for the normal AssetsAPI.list method
+
+        Returns:
+            PowerAssetList: List of the requested assets.
         """
         if self.power_type and asset_type:
             raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
@@ -145,7 +151,16 @@ class GenericPowerAPI(AssetsAPI):
     def retrieve_name(
         self, name: Union[List[str], str], asset_type: str = None, bidding_area: Union[str, List[str]] = None
     ) -> Union[PowerAsset, PowerAssetList]:
-        """Retrieve one or more assets by exact name match. Fails if not exactly one asset is found."""
+        """Retrieve one or more assets by exact name match. Fails if not exactly one asset is found.
+
+        Args:
+            name (Union[List[str], str]): One or more names to search for.
+            asset_type (Union[str, List[str]]): filter on these asset types. Automatically populated for specific APIs
+            bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
+
+        Returns:
+            Union[PowerAsset,PowerAssetList]: The requested asset(s).
+        """
         if isinstance(name, str):
             filters = self._create_filter(asset_type=asset_type, bidding_area=bidding_area)
             result = assert_single_result(super().list(name=name, **filters))

@@ -26,7 +26,7 @@ class PowerAsset(Asset):
     """Extended asset class for Power related resources"""
 
     def metadata_value(self, key: str) -> Optional[str]:
-        "Safe way of getting a metadata value, returns None if metadata or key does not exist"
+        """Safe way of getting a metadata value, returns None if metadata or key does not exist"""
         return (self.metadata or {}).get(key)
 
     @property
@@ -36,6 +36,7 @@ class PowerAsset(Asset):
 
     @property
     def base_voltage(self) -> Optional[float]:
+        """Gets the asset's base voltage as a float, or None if it has no base voltage"""
         bv = self.metadata_value("BaseVoltage_nominalVoltage")
         if bv is not None:
             return float(bv)
@@ -104,7 +105,14 @@ class PowerAsset(Asset):
         """Shortcut for finding the associated Analogs (via it's terminals)"""
         return self.terminals().analogs()
 
-    def time_series(self, measurement_type=None, timeseries_type=None, **kwargs):
+    def time_series(self, measurement_type: str = None, timeseries_type: str = None, **kwargs):
+        """Retrieves the time series in the asset subtree.
+
+        Args:
+            measurement_type: Type of measurement, e.g. ThreePhaseActivePower
+            timeseries_type: Type of time series, e.g. estimated_value
+            kwargs: Other metadata filters
+        """
         metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
         metadata_filter = {k: v for k, v in metadata_filter.items() if v}
         return self._cognite_client.time_series.list(asset_subtree_ids=[self.id], metadata=metadata_filter)
@@ -123,12 +131,16 @@ class PowerAsset(Asset):
 
 
 class Terminal(PowerAsset):
-    def analogs(self):
+    def analogs(self) -> "PowerAssetList":
         """Shortcut for finding the associated Analogs for a Terminal"""
         return self.relationship_sources("Analog")
 
     @property
     def sequence_number(self) -> Optional[int]:
+        """Gets the terminal's sequence number as an int.
+
+        Returns:
+            Optional[int]: The sequence number"""
         seq_number = self.metadata_value("Terminal.sequenceNumber")
         if seq_number is not None:
             return int(seq_number)
@@ -136,6 +148,7 @@ class Terminal(PowerAsset):
             return None
 
     def opposite_end(self) -> "Terminal":
+        """Retrieves the opposite end (Sequence number 1 to 2 and vice versa), works on Terminals associated with both ACLineSegment and PowerTransformerEnd"""
         seq_number = self.sequence_number
         if seq_number not in [1, 2]:
             raise ValueError(f"Can't get opposite end for terminal with sequence number {seq_number}, should be 1 or 2")
@@ -156,10 +169,9 @@ class Analog(PowerAsset):
 
 
 class PowerTransformer(PowerAsset):
-    def ac_line_segments(self, base_voltage: Iterable = None):
-        return self.relationship_targets("ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage)
-
-    def power_transformer_ends(self, end_number: Optional[Union[int, Iterable]] = None, base_voltage: Iterable = None):
+    def power_transformer_ends(
+        self, end_number: Optional[Union[int, Iterable]] = None, base_voltage: Iterable = None
+    ) -> "PowerAssetList":
         """Shortcut for finding the associated PowerTransformerEnds for a PowerTransformer
         Args:
             end_number: filter on transformer end number
@@ -172,39 +184,47 @@ class PowerTransformer(PowerAsset):
             end_number_filter = None
         return self.relationship_sources("PowerTransformerEnd", base_voltage=base_voltage, x_filter=end_number_filter)
 
-    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
+    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
+        """Shortcut for finding the terminals on all the PowerTransformerEnds for a PowerTransformer"""
         return self.power_transformer_ends().terminals(sequence_number=sequence_number)
 
-    def substation(self):
+    def substation(self) -> "Substation":
+        """Shortcut for finding the substation for a PowerTransformer"""
         return assert_single_result(self.relationship_targets("Substation"))
 
 
 class Substation(PowerAsset):
-    def power_transformers(self):
+    def power_transformers(self) -> "PowerAssetList":
+        """Shortcut for finding the PowerTransformers for a Substation"""
         return self.relationship_sources("PowerTransformer")
 
-    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
+    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
+        """Shortcut for finding the terminals for a substation"""
         filter = self._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
-    def ac_line_segments(self, base_voltage: Iterable = None):
+    def ac_line_segments(self, base_voltage: Iterable = None) -> "PowerAssetList":
+        """Shortcut for finding the connected ACLineSegments for a substation"""
         return self.terminals().ac_line_segments(base_voltage=base_voltage)
 
 
 class PowerTransformerEnd(PowerAsset):
-    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
+    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
-    def substation(self):
+    def substation(self) -> Substation:
+        """Shortcut for finding the substation for a PowerTransformerEnd"""
         return self.power_transformer().substation()
 
-    def power_transformer(self):
+    def power_transformer(self) -> "PowerTransformer":
+        """Shortcut for finding the PowerTransformer for a PowerTransformerEnd"""
         return assert_single_result(self.relationship_targets("PowerTransformer"))
 
     @property
     def end_number(self) -> Optional[int]:
+        """Gets the PowerTransformerEnd's end number as an int."""
         end_number = self.metadata_value("TransformerEnd.endNumber")
         if end_number is not None:
             return int(end_number)
@@ -239,29 +259,27 @@ class SynchronousMachine(PowerAsset):
         filter = self._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
-    def GeneratingUnit(self) -> GeneratingUnit:
-        if self.type != "SynchronousMachine":
-            raise WrongPowerTypeError(
-                "Can only find the power GeneratingUnit for a SynchronousMachine, not for a  {}.".format(self.type)
-            )
+    def generating_unit(self) -> GeneratingUnit:
+        """Shortcut for finding the associated GeneratingUnit for a SynchronousMachine"""
         return PowerAsset._load_from_asset(
             assert_single_result([a for a in self.relationship_sources() if "GeneratingUnit" in a.type]),
             "GeneratingUnit",
             self._cognite_client,
         )
 
-    def substation(self):
-        """Shortcut for finding the associated transformer for a PowerTransformer, PowerTransformerEnd, .."""
-        return self.GeneratingUnit().substation()
+    def substation(self) -> Substation:
+        """Shortcut for finding the associated substation for a SynchronousMachine"""
+        return self.generating_unit().substation()
 
 
 class ACLineSegment(PowerAsset):
-    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
+    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
-    def substations(self):
+    def substations(self) -> "PowerAssetList":
+        """Shortcut for finding the connected substations"""
         return self.terminals().substations()
 
 
@@ -271,6 +289,7 @@ class PowerAssetList(AssetList):
 
     @property
     def type(self) -> Optional[str]:
+        """Type of the list of assets, will raise a MixedPowerAssetListException if the list contains several asset types."""
         if not self.data:
             return None
         types = list({a.type for a in self.data})
@@ -355,10 +374,17 @@ class PowerAssetList(AssetList):
             x_filter=x_filter,
         )
 
-    def power_transformer_ends(self, end_number: Optional[Union[int, Iterable]] = None, base_voltage: Iterable = None):
-        """Shortcut for finding the associated PowerTransformerEnds for a list of PowerTransformers
+    def power_transformer_ends(
+        self, end_number: Optional[Union[int, Iterable]] = None, base_voltage: Optional[Iterable] = None
+    ) -> "PowerAssetList":
+        """Shortcut for finding the associated PowerTransformerEnds for a list of PowerTransformers or Terminals
+
         Args:
-            end_number: filter on transformer end number
+            end_number (Union[int, Iterable]): filter on transformer end number
+            base_voltage (Iterable): filter on base voltage
+
+        Returns:
+            PowerAssetList: List of PowerTransformerEnd
         """
         if end_number is not None:
             if not isinstance(end_number, Iterable):
@@ -378,7 +404,8 @@ class PowerAssetList(AssetList):
                 "PowerTransformerEnd", base_voltage=base_voltage, x_filter=end_number_filter
             )
 
-    def power_transformers(self):
+    def power_transformers(self) -> "PowerAssetList":
+        """Shortcut for finding the associated PowerTransformer for a list of PowerTransformerEnd or Substation"""
         if self.has_type("PowerTransformerEnd"):
             return self.relationship_targets("PowerTransformer")
         elif self.has_type("Substation"):
@@ -388,7 +415,8 @@ class PowerAssetList(AssetList):
         else:
             raise ValueError(f"Can't get substations for a list of {self.type}")
 
-    def substations(self):
+    def substations(self) -> "PowerAssetList":
+        """Shortcut for finding the associated Substations for a list of PowerTransformer, ACLineSegment or Terminal"""
         if self.has_type("PowerTransformer"):
             return self.relationship_targets("Substation")
         elif self.has_type("Terminal"):
@@ -401,6 +429,7 @@ class PowerAssetList(AssetList):
             raise ValueError(f"Can't get substations for a list of {self.type}")
 
     def ac_line_segments(self, base_voltage: Iterable = None):
+        """Shortcut for finding the associated ACLineSegment for a list of PowerTransformer, Substation or Terminal"""
         if self.has_type("PowerTransformer"):
             return self.substations().ac_line_segments(base_voltage=base_voltage)
         if self.has_type("Substation"):
@@ -413,6 +442,7 @@ class PowerAssetList(AssetList):
             raise ValueError(f"Can't get substations for a list of {self.type}")
 
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
+        """Shortcut for finding the associated Terminals. Works on lists with mixed asset types"""
         """Shortcut for finding the associated Terminals. For a power transformer list, will retrieve all terminals via terminal ends of the specified end_number(s)"""
         try:
             if self.has_type("PowerTransformer"):
@@ -430,6 +460,7 @@ class PowerAssetList(AssetList):
         return self.relationship_sources("Analog")
 
     def opposite_ends(self):
+        """Shortcut for finding the opposite ends for a list of PowerTransformerEnd or Terminals"""
         if self.has_type("PowerTransformerEnd"):
             end_numbers = {a.end_number for a in self.data}
             if end_numbers != {1} and end_numbers != {2}:
@@ -452,7 +483,13 @@ class PowerAssetList(AssetList):
         else:
             raise ValueError(f"Can't get opposite ends for a list of {self.type}")
 
-    def time_series(self, measurement_type=None, timeseries_type=None, **kwargs):
+    def time_series(self, measurement_type=None, timeseries_type=None, **kwargs) -> TimeSeriesList:
+        """Retrieves the time series in the asset subtrees.
+
+        Args:
+            measurement_type: Type of measurement, e.g. ThreePhaseActivePower
+            timeseries_type: Type of time series, e.g. estimated_value
+            kwargs: Other metadata filters"""
         metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
         metadata_filter = {k: v for k, v in metadata_filter.items() if v}
         chunk_size = 100

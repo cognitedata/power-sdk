@@ -5,16 +5,20 @@ from cognite.power._api.generic_power import GenericPowerAPI
 class PowerClient(CogniteClient):
     """Main entrypoint into Cognite Power SDK. All services are made available through this object.
 
-    In addition to all functionality from the basic and experimental Cognite Python SDK, includes:
-    * `.ac_line_segments`
-    * `.substations`
-    * `.synchronous_machines`
-    * `.hydro_generating_units`, `.wind_generating_units`
-    * `.power_transformers`
-    * `.power_transformer_ends`
-    * `.terminals`
-    * `.analogs`
-    Each of which has a `list` function which returns the specific assets only. See documentation for GenericPowerAPI for details.
+    In addition to all functionality from the basic and experimental Cognite Python SDK, includes APIs for:
+
+        * ``.ac_line_segments``
+        * ``.substations``
+        * ``.synchronous_machines``
+        * ``.hydro_generating_units``
+        * ``.wind_generating_units``
+        * ``.power_transformers``
+        * ``.power_transformer_ends``
+        * ``.terminals``
+        * ``.analogs``
+        * ``.power_assets``: does not filter by type.
+
+    Each of which is a GenericPowerAPI which returns assets of the relevant type(s).
     """
 
     def __init__(
