@@ -50,6 +50,8 @@ pytest = "^5.3"
 pytest-cov = "^2.8"
 tox = "^3.14"
 tox-pyenv = "^1.1"
+sphinx = "^2.4.4"
+sphinx-rtd-theme = "^0.4.3"
 
 
 [[tool.poetry.source]]
