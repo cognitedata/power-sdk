@@ -201,7 +201,7 @@ class Substation(PowerAsset):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the terminals for a substation"""
         filter = self._sequence_number_filter(sequence_number)
-        return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
+        return self.relationship_sources("Terminal", x_filter=filter)
 
     def ac_line_segments(self, base_voltage: Iterable = None) -> "PowerAssetList":
         """Shortcut for finding the connected ACLineSegments for a substation"""
@@ -417,10 +417,8 @@ class PowerAssetList(AssetList):
 
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the associated Substations for a list of PowerTransformer, ACLineSegment or Terminal"""
-        if self.has_type("PowerTransformer"):
+        if self.has_type("PowerTransformer") or self.has_type("Terminal"):
             return self.relationship_targets("Substation")
-        elif self.has_type("Terminal"):
-            return self.relationship_targets("Substation", relationship_type="connectsTo")
         elif self.has_type("ACLineSegment"):
             return self.terminals().substations()
         elif not self.data:
@@ -444,15 +442,17 @@ class PowerAssetList(AssetList):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
         """Shortcut for finding the associated Terminals. Works on lists with mixed asset types"""
         """Shortcut for finding the associated Terminals. For a power transformer list, will retrieve all terminals via terminal ends of the specified end_number(s)"""
+        filter = PowerAsset._sequence_number_filter(sequence_number)
         try:
             if self.has_type("PowerTransformer"):
                 return self.power_transformer_ends().terminals(sequence_number=sequence_number)
+            elif self.has_type("Substation"):
+                return self.relationship_sources("Terminal", x_filter=filter)
         except MixedPowerAssetListException:
             return PowerAssetList(
                 sum([assets.terminals() for _type, assets in self.split_by_type().items()], []),
                 cognite_client=self._cognite_client,
             )
-        filter = PowerAsset._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
 
     def analogs(self):
