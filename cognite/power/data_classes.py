@@ -207,6 +207,24 @@ class Substation(PowerAsset):
         """Shortcut for finding the connected ACLineSegments for a substation"""
         return self.terminals().ac_line_segments(base_voltage=base_voltage)
 
+    def connected_substations(self, *args, **kwargs):
+        """See PowerAssetList.connected_substations"""
+        return PowerAssetList([self], cognite_client=self._cognite_client).connected_substations(*args, **kwargs)
+
+    def distance(self, target: "Substation") -> int:
+        """Shortest distance to target substation. Not efficient. Returns infinity if there is no connection."""
+        distance = 0
+        level_visit = {self}
+        visited = {self}
+        while level_visit:
+            if target in level_visit:
+                return distance
+            level_pcl = PowerAssetList(list(level_visit), cognite_client=self._cognite_client)
+            level_visit = set(level_pcl.connected_substations()) - visited
+            visited.update(level_visit)
+            distance += 1
+        return np.inf
+
 
 class PowerTransformerEnd(PowerAsset):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
@@ -413,7 +431,7 @@ class PowerAssetList(AssetList):
         elif not self.data:
             return PowerAssetList([])
         else:
-            raise ValueError(f"Can't get substations for a list of {self.type}")
+            raise WrongPowerTypeError(f"Can't get PowerTransformers for a list of {self.type}")
 
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the associated Substations for a list of PowerTransformer, ACLineSegment or Terminal"""
@@ -424,7 +442,7 @@ class PowerAssetList(AssetList):
         elif not self.data:
             return PowerAssetList([])
         else:
-            raise ValueError(f"Can't get substations for a list of {self.type}")
+            raise WrongPowerTypeError(f"Can't get substations for a list of {self.type}")
 
     def ac_line_segments(self, base_voltage: Iterable = None):
         """Shortcut for finding the associated ACLineSegment for a list of PowerTransformer, Substation or Terminal"""
@@ -437,7 +455,7 @@ class PowerAssetList(AssetList):
         elif not self.data:
             return PowerAssetList([])
         else:
-            raise ValueError(f"Can't get substations for a list of {self.type}")
+            raise WrongPowerTypeError(f"Can't get ACLineSegments for a list of {self.type}")
 
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
         """Shortcut for finding the associated Terminals. Works on lists with mixed asset types"""
@@ -481,7 +499,7 @@ class PowerAssetList(AssetList):
                 al = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
             return al.terminals(sequence_number=opposite_seq_number)
         else:
-            raise ValueError(f"Can't get opposite ends for a list of {self.type}")
+            raise WrongPowerTypeError(f"Can't get opposite ends for a list of {self.type}")
 
     def time_series(self, measurement_type=None, timeseries_type=None, **kwargs) -> TimeSeriesList:
         """Retrieves the time series in the asset subtrees.
@@ -500,3 +518,15 @@ class PowerAssetList(AssetList):
         ]
         res_list = execute_tasks_concurrently(self._cognite_client.time_series.list, tasks, max_workers=10)
         return TimeSeriesList(sum(res_list.joined_results(), []))
+
+    def connected_substations(self, level=1, base_voltage=None):
+        """Retrieves substations connected within level connections through ac_line_segments with base voltages within the specified range"""
+        if not self.has_type("Substation"):
+            raise ValueError(f"Can't get connected substations ends for a list of {self.type}")
+        returned_substations = set(self.data)
+        level_ss = self
+        for i in range(level):
+            level_ss = level_ss.ac_line_segments(base_voltage=base_voltage).substations()
+            level_ss.data = [a for a in level_ss.data if a not in returned_substations]
+            returned_substations.update(level_ss)
+        return PowerAssetList(list(returned_substations), cognite_client=self._cognite_client)
