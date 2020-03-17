@@ -207,7 +207,7 @@ class Substation(PowerAsset):
         """Shortcut for finding the connected ACLineSegments for a substation"""
         return self.terminals().ac_line_segments(base_voltage=base_voltage)
 
-    def connected_substations(self, *args, **kwargs):
+    def connected_substations(self, *args, **kwargs) -> "PowerAssetList":
         """See PowerAssetList.connected_substations"""
         return PowerAssetList([self], cognite_client=self._cognite_client).connected_substations(*args, **kwargs)
 
@@ -519,14 +519,26 @@ class PowerAssetList(AssetList):
         res_list = execute_tasks_concurrently(self._cognite_client.time_series.list, tasks, max_workers=10)
         return TimeSeriesList(sum(res_list.joined_results(), []))
 
-    def connected_substations(self, level=1, base_voltage=None):
-        """Retrieves substations connected within level connections through ac_line_segments with base voltages within the specified range"""
+    def connected_substations(
+        self, level: int = 1, exact: bool = False, base_voltage: Iterable = None
+    ) -> "PowerAssetList":
+        """Retrieves substations connected within level connections through ac_line_segments with base voltages within the specified range
+
+        Args:
+                level: number of connections to traverse
+                exact: only return substations whose minimum distance is exactly level
+                base_voltage: only consider ACLineSegments with these base voltage
+        """
         if not self.has_type("Substation"):
-            raise ValueError(f"Can't get connected substations ends for a list of {self.type}")
+            raise ValueError(f"Can't get connected substations for a list of {self.type}")
         returned_substations = set(self.data)
         level_ss = self
         for i in range(level):
             level_ss = level_ss.ac_line_segments(base_voltage=base_voltage).substations()
             level_ss.data = [a for a in level_ss.data if a not in returned_substations]
+            if not level_ss:
+                break
             returned_substations.update(level_ss)
+        if exact:
+            returned_substations = level_ss
         return PowerAssetList(list(returned_substations), cognite_client=self._cognite_client)
