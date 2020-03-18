@@ -520,25 +520,35 @@ class PowerAssetList(AssetList):
         return TimeSeriesList(sum(res_list.joined_results(), []))
 
     def connected_substations(
-        self, level: int = 1, exact: bool = False, base_voltage: Iterable = None
+        self, level: int = 1, exact: bool = False, include_lines=False, base_voltage: Iterable = None
     ) -> "PowerAssetList":
         """Retrieves substations connected within level connections through ac_line_segments with base voltages within the specified range
 
         Args:
                 level: number of connections to traverse
                 exact: only return substations whose minimum distance is exactly level
+                include_lines: also return ACLineSegments that make up the connections. Can not be used in combination with exact.
                 base_voltage: only consider ACLineSegments with these base voltage
         """
+        if exact and include_lines:
+            raise ArgumentError("Can not include lines for when an exact distance is requested")
         if not self.has_type("Substation"):
-            raise ValueError(f"Can't get connected substations for a list of {self.type}")
-        returned_substations = set(self.data)
-        level_ss = self
+            raise WrongPowerTypeError(f"Can't get connected substations for a list of {self.type}")
+        visited_substations = set(self.data)
+        visited_lines = set()
+        substations_at_level = self
         for i in range(level):
-            level_ss = level_ss.ac_line_segments(base_voltage=base_voltage).substations()
-            level_ss.data = [a for a in level_ss.data if a not in returned_substations]
-            if not level_ss:
+            ac_line_segments = substations_at_level.ac_line_segments(base_voltage=base_voltage)
+            substations_at_level = ac_line_segments.substations()
+            substations_at_level.data = [a for a in substations_at_level.data if a not in visited_substations]
+            if not substations_at_level:
                 break
-            returned_substations.update(level_ss)
+            visited_lines.update(ac_line_segments)
+            visited_substations.update(substations_at_level)
         if exact:
-            returned_substations = level_ss
-        return PowerAssetList(list(returned_substations), cognite_client=self._cognite_client)
+            returned_assets = substations_at_level
+        elif include_lines:
+            returned_assets = list(visited_substations) + list(visited_lines)
+        else:
+            returned_assets = visited_substations
+        return PowerAssetList(list(returned_assets), cognite_client=self._cognite_client)
