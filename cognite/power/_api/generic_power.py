@@ -44,6 +44,8 @@ class GenericPowerAPI(AssetsAPI):
         if asset_type:
             filters["metadata"]["type"] = asset_type
         if grid_type:
+            if not grid_type.startswith("GridTypeKind."):
+                grid_type = "GridTypeKind." + grid_type
             filters["metadata"][self.grid_type_field_name] = grid_type
         return filters
 
@@ -59,7 +61,7 @@ class GenericPowerAPI(AssetsAPI):
         """Lists power assets. Supports all parameters as the normal list function in addition to some power specific ones.
 
         Args:
-            grid_type (str): filters on Equipment.gridType
+            grid_type (str): filters on Equipment.gridType. Can give "GridTypeKind.regional" or just "regional" etc.
             base_voltage (Iterable): filters on BaseVoltage_nominalVoltage in the given range or list.
             bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
             asset_type (Union[str, List[str]]): filter on these asset types. Automatically populated for specific APIs
@@ -105,7 +107,7 @@ class GenericPowerAPI(AssetsAPI):
         """Search power assets. Supports all parameters as the normal search function in addition to some power specific ones.
 
         Args:
-            grid_type (str): filters on Equipment.gridType
+            grid_type (str): filters on Equipment.gridType. Can give "GridTypeKind.regional" or just "regional" etc.
             base_voltage (Iterable): filters on BaseVoltage_nominalVoltage in the given range or list.
             bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
             asset_type (Union[str, List[str]]): filter on these asset types. Automatically populated for specific APIs

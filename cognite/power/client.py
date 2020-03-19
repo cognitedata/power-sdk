@@ -1,5 +1,6 @@
 from cognite.client.experimental import CogniteClient
 from cognite.power._api.generic_power import GenericPowerAPI
+from cognite.power._api.power_transformer_ends_api import PowerTransformerEndsAPI
 
 
 class PowerClient(CogniteClient):
@@ -39,9 +40,7 @@ class PowerClient(CogniteClient):
         self.wind_generating_units = GenericPowerAPI("WindGeneratingUnit", self.config, self._API_VERSION, self)
 
         self.power_transformers = GenericPowerAPI("PowerTransformer", self.config, self._API_VERSION, self)
-        self.power_transformer_ends = GenericPowerAPI(
-            "PowerTransformerEnd", self.config, self._API_VERSION, self, grid_type_field="TransformerEnd.gridType"
-        )
+        self.power_transformer_ends = PowerTransformerEndsAPI(self.config, self._API_VERSION, self)
 
         self.terminals = GenericPowerAPI("Terminal", self.config, self._API_VERSION, self)
         self.analogs = GenericPowerAPI("Analog", self.config, self._API_VERSION, self)
