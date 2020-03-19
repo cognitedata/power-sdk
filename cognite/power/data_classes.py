@@ -156,12 +156,16 @@ class Terminal(PowerAsset):
 
         al = self.relationship_targets(power_type="ACLineSegment", relationship_type="connectsTo")
         if not al:
-            al = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
-        if not al:
-            raise SinglePowerAssetExpected(
-                al, f"Could not find any ACLineSegment or PowerTransformerEnd connected to terminal {self.external_id}"
+            pte = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+            if not pte:
+                raise SinglePowerAssetExpected(
+                    al,
+                    f"Could not find any ACLineSegment or PowerTransformerEnd connected to terminal {self.external_id}",
+                )
+            return assert_single_result(
+                assert_single_result(pte).opposite_end().terminals(sequence_number=opposite_seq_number)
             )
-        return assert_single_result(al[0].terminals(sequence_number=opposite_seq_number))
+        return assert_single_result(assert_single_result(al).terminals(sequence_number=opposite_seq_number))
 
 
 class Analog(PowerAsset):
@@ -496,7 +500,8 @@ class PowerAssetList(AssetList):
             opposite_seq_number = 1 if list(seq_numbers)[0] == 2 else 2
             al = self.relationship_targets(power_type="ACLineSegment", relationship_type="connectsTo")
             if not al:
-                al = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+                pte = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+                return pte.opposite_ends().terminals(sequence_number=opposite_seq_number)
             return al.terminals(sequence_number=opposite_seq_number)
         else:
             raise WrongPowerTypeError(f"Can't get opposite ends for a list of {self.type}")
