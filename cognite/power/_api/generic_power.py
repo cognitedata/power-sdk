@@ -11,7 +11,7 @@ class GenericPowerAPI(AssetsAPI):
         self.power_type = power_type
         if power_type:
             assert _str_to_class(self.power_type) is not None
-            self.grid_type_field_name = grid_type_field
+        self.grid_type_field_name = grid_type_field
         super().__init__(config, api_version, cognite_client)
 
     def _all_bidding_area(self):

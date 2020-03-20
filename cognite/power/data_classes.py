@@ -22,6 +22,12 @@ def _str_to_class(classname):
     return getattr(sys.modules[__name__], classname, None)
 
 
+def _remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    return text
+
+
 class PowerAsset(Asset):
     """Extended asset class for Power related resources"""
 
@@ -42,6 +48,12 @@ class PowerAsset(Asset):
             return float(bv)
         else:
             return None
+
+    @property
+    def grid_type(self) -> Optional[str]:
+        """Gets the asset's grid type, without 'GridTypeKind.' prefix."""
+        gt = self.metadata_value("Equipment.gridType")
+        return _remove_prefix(gt, "GridTypeKind.") if gt else None
 
     def relationship_sources(
         self,
@@ -207,9 +219,9 @@ class Substation(PowerAsset):
         filter = self._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", x_filter=filter)
 
-    def ac_line_segments(self, base_voltage: Iterable = None) -> "PowerAssetList":
+    def ac_line_segments(self, base_voltage: Iterable = None, grid_type: Optional[str] = None) -> "PowerAssetList":
         """Shortcut for finding the connected ACLineSegments for a substation"""
-        return self.terminals().ac_line_segments(base_voltage=base_voltage)
+        return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
 
     def connected_substations(self, *args, **kwargs) -> "PowerAssetList":
         """See PowerAssetList.connected_substations"""
@@ -235,6 +247,12 @@ class PowerTransformerEnd(PowerAsset):
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
         return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
+
+    @property
+    def grid_type(self) -> Optional[str]:
+        """Gets the asset's grid type, without 'GridTypeKind.' prefix."""
+        gt = self.metadata_value("TransformerEnd.gridType")
+        return _remove_prefix(gt, "GridTypeKind.") if gt else None
 
     def substation(self) -> Substation:
         """Shortcut for finding the substation for a PowerTransformerEnd"""
@@ -448,14 +466,17 @@ class PowerAssetList(AssetList):
         else:
             raise WrongPowerTypeError(f"Can't get substations for a list of {self.type}")
 
-    def ac_line_segments(self, base_voltage: Iterable = None):
+    def ac_line_segments(self, base_voltage: Iterable = None, grid_type: Optional[str] = None):
         """Shortcut for finding the associated ACLineSegment for a list of PowerTransformer, Substation or Terminal"""
         if self.has_type("PowerTransformer"):
-            return self.substations().ac_line_segments(base_voltage=base_voltage)
+            return self.substations().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
         if self.has_type("Substation"):
-            return self.terminals().ac_line_segments(base_voltage=base_voltage)
+            return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
         elif self.has_type("Terminal"):
-            return self.relationship_targets("ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage)
+            filter = (lambda a: a.grid_type == grid_type) if grid_type is not None else None
+            return self.relationship_targets(
+                "ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage, x_filter=filter,
+            )
         elif not self.data:
             return PowerAssetList([])
         else:
