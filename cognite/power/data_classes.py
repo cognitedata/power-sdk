@@ -55,63 +55,13 @@ class PowerAsset(Asset):
         gt = self.metadata_value("Equipment.gridType")
         return _remove_prefix(gt, "GridTypeKind.") if gt else None
 
-    def relationship_sources(
-        self,
-        power_type,
-        resource_type="Asset",
-        relationship_type="belongsTo",
-        base_voltage: Iterable = None,
-        x_filter: Callable = None,
-    ):
-        """Shortcut for finding all assets that are a source, with the current asset as a target"""
-        rels = self._cognite_client.relationships.list(
-            source_resource=resource_type,
-            target_resource="Asset",
-            target_resource_id=self.external_id,
-            relationship_type=relationship_type,
-            limit=None,
-        )
-        return PowerAsset._filter_and_convert(
-            self._cognite_client, [r.source["resourceId"] for r in rels], power_type, base_voltage, x_filter
-        )
+    def relationship_sources(self, *args, **kwargs):
+        """Shortcut for finding all assets that are a source, with the current asset as a target - see PowerAssetList.relationship_sources for arguments"""
+        return PowerAssetList([self], cognite_client=self._cognite_client).relationship_sources(*args, **kwargs)
 
-    def relationship_targets(
-        self,
-        power_type,
-        resource_type="Asset",
-        relationship_type="belongsTo",
-        base_voltage: Iterable = None,
-        x_filter: Callable = None,
-    ):
-        """Shortcut for finding all assets that are a target, with the current asset as a source"""
-        rels = self._cognite_client.relationships.list(
-            target_resource=resource_type,
-            source_resource="Asset",
-            source_resource_id=self.external_id,
-            relationship_type=relationship_type,
-            limit=None,
-        )
-        return PowerAsset._filter_and_convert(
-            self._cognite_client, [r.target["resourceId"] for r in rels], power_type, base_voltage, x_filter
-        )
-
-    @staticmethod
-    def _filter_and_convert(
-        client, external_ids, power_type, base_voltage: Iterable = None, x_filter: Callable = None
-    ) -> "PowerAssetList":
-        external_ids = list(np.unique(external_ids))
-        assets = client.assets.retrieve_multiple(external_ids=external_ids, ignore_unknown_ids=True)
-        if len(assets) != len(external_ids):
-            warnings.warn(
-                "{} assets not found when looking up {}s among {}".format(
-                    len(external_ids) - len(assets), power_type, external_ids
-                )
-            )
-        if power_type:
-            assets = [a for a in assets if (a.metadata or {}).get("type") == power_type]
-        return PowerAssetList._load_assets(
-            assets, power_type, cognite_client=client, base_voltage=base_voltage, x_filter=x_filter
-        )
+    def relationship_targets(self, *args, **kwargs):
+        """Shortcut for finding all assets that are a target, with the current asset as a source - see PowerAssetList.relationship_targets for arguments"""
+        return PowerAssetList([self], cognite_client=self._cognite_client).relationship_targets(*args, **kwargs)
 
     def analogs(self):
         """Shortcut for finding the associated Analogs (via it's terminals)"""
@@ -210,9 +160,9 @@ class PowerTransformer(PowerAsset):
 
 
 class Substation(PowerAsset):
-    def power_transformers(self) -> "PowerAssetList":
+    def power_transformers(self, grid_type: Optional[str] = None) -> "PowerAssetList":
         """Shortcut for finding the PowerTransformers for a Substation"""
-        return self.relationship_sources("PowerTransformer")
+        return self.relationship_sources("PowerTransformer", grid_type=grid_type)
 
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the terminals for a substation"""
@@ -351,67 +301,98 @@ class PowerAssetList(AssetList):
 
     @staticmethod
     def _load_assets(
-        assets, class_name, cognite_client, base_voltage: Iterable = None, x_filter: Callable = None
+        assets,
+        class_name,
+        cognite_client,
+        base_voltage: Iterable = None,
+        grid_type: str = None,
+        x_filter: Callable = None,
     ) -> "PowerAssetList":
         power_assets = [PowerAsset._load_from_asset(a, class_name, cognite_client) for a in assets]
         if x_filter:
             power_assets = [a for a in power_assets if x_filter(a)]
         if base_voltage is not None:
             power_assets = [a for a in power_assets if a.base_voltage in base_voltage]
+        if grid_type is not None:
+            power_assets = [a for a in power_assets if a.grid_type == grid_type]
         return PowerAssetList(power_assets, cognite_client=cognite_client)
 
-    def relationship_sources(
-        self,
+    @staticmethod
+    def _filter_and_convert(
+        client,
+        external_ids,
         power_type,
-        resource_type="Asset",
-        relationship_type="belongsTo",
         base_voltage: Iterable = None,
+        grid_type: str = None,
         x_filter: Callable = None,
     ) -> "PowerAssetList":
-        """Shortcut for finding all assets that are a source, with the current assets as a target"""
-        if not self.data:
-            return PowerAssetList([], cognite_client=self._cognite_client)
-        rels = []
-        for si in range(0, len(self.data), 1000):
-            rels += self._cognite_client.relationships.list(
-                source_resource=resource_type,
-                targets=[{"resource": "Asset", "resourceId": a.external_id} for a in self.data[si : si + 1000]],
-                relationship_type=relationship_type,
-                limit=None,
+        external_ids = list(np.unique(external_ids))
+        assets = client.assets.retrieve_multiple(external_ids=external_ids, ignore_unknown_ids=True)
+        if len(assets) != len(external_ids):
+            warnings.warn(
+                "{} assets not found when looking up {}s among {}".format(
+                    len(external_ids) - len(assets), power_type, external_ids
+                )
             )
-        return PowerAsset._filter_and_convert(
+        if power_type:
+            assets = [a for a in assets if (a.metadata or {}).get("type") == power_type]
+        return PowerAssetList._load_assets(
+            assets, power_type, cognite_client=client, base_voltage=base_voltage, grid_type=grid_type, x_filter=x_filter
+        )
+
+    def relationships(
+        self,
+        power_type: str = None,
+        relationship_type: str = "belongsTo",
+        base_voltage: Optional[Iterable] = None,
+        grid_type: Optional[str] = None,
+        x_filter: Optional[Callable] = None,
+        _sources=None,
+        _targets=None,
+    ) -> "PowerAssetList":
+        """Internal function responsible for finding assets connected by relationships. 
+
+        Args:
+            power_type (str): Type of asset, e.g. PowerTransformer
+            relationship_type (str): Type of relationship, typically belongsTo or connectsTo
+            base_voltage (str):
+            grid_type (str):
+            x_filter (Callable): Other filter to be applied to the asset, returns those for which x_filter(asset) is truthy after converting the asset to the proper type
+            _sources, _targets: internally passed by relationship_sources/relationship_targets
+        Returns:
+            PowerAssetList: list of connected assets
+        """
+        if _sources and _targets:
+            raise ArgumentError("Can not combine _sources and _targets.")
+        if not _sources and not _targets:
+            return PowerAssetList([], cognite_client=self._cognite_client)
+        rels = self._cognite_client.relationships.list(
+            sources=_sources, targets=_targets, relationship_type=relationship_type, limit=None
+        )
+        if _sources:
+            asset_ids = [r.target["resourceId"] for r in rels]
+        else:
+            asset_ids = [r.source["resourceId"] for r in rels]
+
+        return PowerAssetList._filter_and_convert(
             self._cognite_client,
-            [r.source["resourceId"] for r in rels],
+            asset_ids,
             power_type,
             base_voltage=base_voltage,
+            grid_type=grid_type,
             x_filter=x_filter,
         )
 
-    def relationship_targets(
-        self,
-        power_type,
-        resource_type="Asset",
-        relationship_type="belongsTo",
-        base_voltage: Iterable = None,
-        x_filter: Callable = None,
-    ) -> "PowerAssetList":
-        """Shortcut for finding all assets that are a target, with the current assets as a source"""
-        if not self.data:
-            return PowerAssetList([], cognite_client=self._cognite_client)
-        rels = []
-        for si in range(0, len(self.data), 1000):
-            rels += self._cognite_client.relationships.list(
-                target_resource=resource_type,
-                sources=[{"resource": "Asset", "resourceId": a.external_id} for a in self.data[si : si + 1000]],
-                relationship_type=relationship_type,
-                limit=None,
-            )
-        return PowerAsset._filter_and_convert(
-            self._cognite_client,
-            [r.target["resourceId"] for r in rels],
-            power_type,
-            base_voltage=base_voltage,
-            x_filter=x_filter,
+    def relationship_sources(self, *args, **kwargs) -> "PowerAssetList":
+        """Shortcut for finding all assets that are a source, with the current assets as targets. See PowerAssetList.relationships for list of arguments."""
+        return self.relationships(
+            _sources=None, _targets=[{"resource": "Asset", "resourceId": a.external_id} for a in self], *args, **kwargs
+        )
+
+    def relationship_targets(self, *args, **kwargs) -> "PowerAssetList":
+        """Shortcut for finding all assets that are a target, with the current assets as sources. See PowerAssetList.relationships for list of arguments."""
+        return self.relationships(
+            _sources=[{"resource": "Asset", "resourceId": a.external_id} for a in self], _targets=None, *args, **kwargs
         )
 
     def power_transformer_ends(
@@ -444,12 +425,12 @@ class PowerAssetList(AssetList):
                 "PowerTransformerEnd", base_voltage=base_voltage, x_filter=end_number_filter
             )
 
-    def power_transformers(self) -> "PowerAssetList":
+    def power_transformers(self, grid_type: Optional[str] = None) -> "PowerAssetList":
         """Shortcut for finding the associated PowerTransformer for a list of PowerTransformerEnd or Substation"""
         if self.has_type("PowerTransformerEnd"):
-            return self.relationship_targets("PowerTransformer")
+            return self.relationship_targets("PowerTransformer", grid_type=grid_type)
         elif self.has_type("Substation"):
-            return self.relationship_sources("PowerTransformer")
+            return self.relationship_sources("PowerTransformer", grid_type=grid_type)
         elif not self.data:
             return PowerAssetList([])
         else:
@@ -468,14 +449,11 @@ class PowerAssetList(AssetList):
 
     def ac_line_segments(self, base_voltage: Iterable = None, grid_type: Optional[str] = None):
         """Shortcut for finding the associated ACLineSegment for a list of PowerTransformer, Substation or Terminal"""
-        if self.has_type("PowerTransformer"):
-            return self.substations().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
         if self.has_type("Substation"):
             return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
         elif self.has_type("Terminal"):
-            filter = (lambda a: a.grid_type == grid_type) if grid_type is not None else None
             return self.relationship_targets(
-                "ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage, x_filter=filter,
+                "ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage, grid_type=grid_type
             )
         elif not self.data:
             return PowerAssetList([])
@@ -546,7 +524,12 @@ class PowerAssetList(AssetList):
         return TimeSeriesList(sum(res_list.joined_results(), []))
 
     def connected_substations(
-        self, level: int = 1, exact: bool = False, include_lines=False, base_voltage: Iterable = None
+        self,
+        level: int = 1,
+        exact: bool = False,
+        include_lines=False,
+        base_voltage: Iterable = None,
+        grid_type: Optional[str] = None,
     ) -> "PowerAssetList":
         """Retrieves substations connected within level connections through ac_line_segments with base voltages within the specified range
 
@@ -555,6 +538,7 @@ class PowerAssetList(AssetList):
                 exact: only return substations whose minimum distance is exactly level
                 include_lines: also return ACLineSegments that make up the connections. Can not be used in combination with exact.
                 base_voltage: only consider ACLineSegments with these base voltage
+                grid_type:  only consider ACLineSegments of this grid type
         """
         if exact and include_lines:
             raise ArgumentError("Can not include lines for when an exact distance is requested")
@@ -564,7 +548,7 @@ class PowerAssetList(AssetList):
         visited_lines = set()
         substations_at_level = self
         for i in range(level):
-            ac_line_segments = substations_at_level.ac_line_segments(base_voltage=base_voltage)
+            ac_line_segments = substations_at_level.ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
             substations_at_level = ac_line_segments.substations()
             substations_at_level.data = [a for a in substations_at_level.data if a not in visited_substations]
             if not substations_at_level:

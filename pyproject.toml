@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cognite-power-sdk"
-version = "0.6.6"
+version = "0.7.0"
 description = "Cognite Power SDK"
 authors = ["Sander Land <sander.land@cognite.com>"]
 
@@ -30,7 +30,7 @@ envlist = py36,py37,py38
 deps =
     pytest
     pytest-cov
-    cognite-sdk
+    cognite-sdk-experimental
     pandas
 
 commands =
@@ -38,8 +38,8 @@ commands =
 """
 
 [tool.poetry.dependencies]
-python = "^3.6"
-cognite-sdk = "^1.4.10"
+python = "^3.6.1"
+cognite-sdk-experimental = "^0.4"
 numpy = "^1.18.1"
 
 [tool.poetry.dev-dependencies]

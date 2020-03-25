@@ -1,4 +1,4 @@
-from cognite.client.experimental import CogniteClient
+from cognite.experimental import CogniteClient
 from cognite.power._api.generic_power import GenericPowerAPI
 from cognite.power._api.power_transformer_ends_api import PowerTransformerEndsAPI
 
