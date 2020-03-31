@@ -41,6 +41,7 @@ commands =
 python = "^3.6.1"
 cognite-sdk-experimental = "^0.4"
 numpy = "^1.18.1"
+networkx = "^2.4"
 
 [tool.poetry.dev-dependencies]
 black = "^19.3b0"
