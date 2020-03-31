@@ -8,9 +8,13 @@ class PowerGraph:
         self._cognite_client = cognite_client
         if subgraph_nodes:
             self.G = nx.Graph()
-            self.G.add_nodes_from(nodes)
+            self.G.add_nodes_from(subgraph_nodes)
             self.G.add_edges_from(
-                (n, nbr, d) for n, nbrs in self.G.adj.items() if n in nodes for nbr, d in nbrs.items() if nbr in nodes
+                (n, nbr, d)
+                for n, nbrs in self.G.adj.items()
+                if n in subgraph_nodes
+                for nbr, d in nbrs.items()
+                if nbr in subgraph_nodes
             )
             self.full_graph = full_graph
         else:
