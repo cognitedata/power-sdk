@@ -2,6 +2,7 @@ import math
 
 import networkx as nx
 
+
 class PowerGraph:
     def __init__(self, client):
         self.load(client)
