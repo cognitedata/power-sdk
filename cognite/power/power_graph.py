@@ -5,7 +5,7 @@ from typing import List
 import networkx as nx
 
 from cognite.client.data_classes import Asset
-from cognite.power import PowerAsset, PowerAssetList
+from cognite.power.data_classes import PowerAsset, PowerAssetList
 
 
 class PowerGraph:

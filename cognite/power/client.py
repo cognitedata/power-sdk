@@ -1,6 +1,7 @@
 from cognite.experimental import CogniteClient
 from cognite.power._api.generic_power import GenericPowerAPI
 from cognite.power._api.power_transformer_ends_api import PowerTransformerEndsAPI
+from cognite.power.power_graph import PowerGraph
 
 
 class PowerClient(CogniteClient):
@@ -47,7 +48,10 @@ class PowerClient(CogniteClient):
 
         self.power_assets = GenericPowerAPI(None, self.config, self._API_VERSION, self)
 
+    #        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
+    #        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
+    #        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
 
-#        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
-#        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
-#        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
+    def power_graph(self) -> PowerGraph:
+        """Returns a PowerGraph with all assets"""
+        return PowerGraph(self)
