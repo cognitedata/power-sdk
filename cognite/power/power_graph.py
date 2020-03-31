@@ -1,3 +1,5 @@
+import math
+
 import networkx as nx
 from matplotlib import pyplot as plt
 
@@ -48,4 +50,29 @@ class PowerGraph:
         ss_edges = [(ss_extid[f], ss_extid[t], {"Line": a}) for f, t, a in edges]
 
         self.G = nx.Graph()
+        self.G.add_nodes_from(ss_extid.values())
         self.G.add_edges_from(ss_edges)
+
+    def _node_locations(self):
+        node_loc = {
+            s: [
+                float(s.metadata.get("PositionPoint.xPosition", math.nan)),
+                float(s.metadata.get("PositionPoint.yPosition", math.nan)),
+            ]
+            for s in self.G.nodes
+        }
+        orphan_count = 0
+        for it in range(2):
+            for s, loc in node_loc.items():
+                if math.isnan(loc[0]):
+                    nb_locs = [node_loc[n] for n in nx.neighbors(self.G, s) if not math.isnan(node_loc[n][0])]
+                    mean_loc = [sum(c) / len(nb_locs) for c in zip(*nb_locs)]
+                    if len(mean_loc) == 2:
+                        node_loc[s] = mean_loc
+                    elif it == 1:
+                        node_loc[s] = [20, 55 + orphan_count]  # TODO don't hardcode this
+                        orphan_count += 1
+        return node_loc
+
+    def draw(self):
+        nx.draw(self.G, labels={n: n.name for n in self.G.nodes()}, font_size=30, pos=self._node_locations())
