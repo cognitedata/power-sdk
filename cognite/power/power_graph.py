@@ -3,10 +3,10 @@ from matplotlib import pyplot as plt
 
 
 class PowerGraph:
-    def __init__(self):
-        self.load()
+    def __init__(self, client):
+        self.load(client)
 
-    def load(self):
+    def load(self, client):
         ssl = client.substations.list()
         acl = client.ac_line_segments.list()
         ss_extid = {s.external_id: s for s in ssl if s.external_id}
