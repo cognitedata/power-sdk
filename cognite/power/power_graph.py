@@ -1,78 +1,101 @@
 import math
+from typing import List
 
 import networkx as nx
 
+from cognite.client.data_classes import Asset
+from cognite.power import PowerAsset, PowerAssetList
+
 
 class PowerGraph:
-    def __init__(self, cognite_client, subgraph_nodes=None, full_graph=None):
+    def __init__(self, cognite_client, subgraph_nodes: List[str] = None, full_graph=None):
         self._cognite_client = cognite_client
         if subgraph_nodes:
+            self.full_graph = full_graph
             self.G = nx.Graph()
-            self.G.add_nodes_from(subgraph_nodes)
+            all_nodes = full_graph.nodes(data=True)
+            self.G.add_nodes_from((k, all_nodes[k]) for k in subgraph_nodes)
             self.G.add_edges_from(
                 (n, nbr, d)
-                for n, nbrs in self.G.adj.items()
+                for n, nbrs in full_graph.adj.items()
                 if n in subgraph_nodes
                 for nbr, d in nbrs.items()
                 if nbr in subgraph_nodes
             )
-            self.full_graph = full_graph
         else:
             self.load()
-            self.full_graph = self
+            self.full_graph = self.G
 
     def load(self):
-        ssl = self._cognite_client.substations.list()
-        acl = self._cognite_client.ac_line_segments.list()
-        ss_extid = {s.external_id: s for s in ssl if s.external_id}
-        acl_extid = {s.external_id: s for s in acl if s.external_id}
+        substations = self._cognite_client.substations.list()
+        ac_line_segments = self._cognite_client.ac_line_segments.list()
 
-        terminal_map = defaultdict(list)
+        substation_from_extid = {s.external_id: s for s in substations if s.external_id}
+        ac_line_segment_from_extid = {s.external_id: s for s in ac_line_segments if s.external_id}
+
+        terminal_con_ac_line_segments = defaultdict(list)
         for rel in self._cognite_client.relationships.list(
-            targets=[{"resourceId": s.external_id} for s in acl], relationship_type="connectsTo", limit=None
+            targets=[{"resourceId": acl.external_id} for acl in ac_line_segments],
+            relationship_type="connectsTo",
+            limit=None,
         ):
-            terminal = rel.source["resourceId"]
-            acls = rel.target["resourceId"]
-            terminal_map[terminal].append(acls)
+            terminal_con_ac_line_segments[rel.source["resourceId"]].append(rel.target["resourceId"])
 
-        for check_terminal in self._cognite_client.assets.retrieve_multiple(external_ids=list(terminal_map.keys())):
+        for check_terminal in self._cognite_client.assets.retrieve_multiple(
+            external_ids=list(terminal_con_ac_line_segments.keys())
+        ):
             if check_terminal.metadata.get("type", None) != "Terminal":
-                del terminal_map[check_terminal.external_id]
+                del terminal_con_ac_line_segments[check_terminal.external_id]
 
-        ss_to_acls_map = defaultdict(list)
-        acls_to_ss_map = defaultdict(list)
+        substation_con_ac_line_segments = defaultdict(list)
+        ac_line_segment_con_substations = defaultdict(list)
 
         for rel in self._cognite_client.relationships.list(
-            targets=[{"resourceId": s.external_id} for s in ssl], relationship_type="belongsTo", limit=None
+            targets=[{"resourceId": s.external_id} for s in substations], relationship_type="belongsTo", limit=None
         ):
-            ss = rel.target["resourceId"]
+            substation = rel.target["resourceId"]
             terminal = rel.source["resourceId"]
-            if ss in ss_extid and terminal in terminal_map:
-                acls = terminal_map.get(terminal, [])
-                ss_to_acls_map[ss].extend(acls)
-                for a in acls:
-                    acls_to_ss_map[a].append(ss)
-
-        edges = [
-            (sfrom, sto, a)
-            for sfrom, acls in ss_to_acls_map.items()
-            for a in acls
-            for sto in acls_to_ss_map[a]
-            if sfrom != sto
-        ]
-        ss_edges = [(ss_extid[f], ss_extid[t], {"Line": a}) for f, t, a in edges]
+            if substation in substation_from_extid and terminal in terminal_con_ac_line_segments:
+                ac_line_segments = terminal_con_ac_line_segments.get(terminal, [])
+                substation_con_ac_line_segments[substation].extend(ac_line_segments)
+                for a in ac_line_segments:
+                    ac_line_segment_con_substations[a].append(substation)
 
         self.G = nx.Graph()
-        self.G.add_nodes_from(ss_extid.values())
-        self.G.add_edges_from(ss_edges)
+        self.G.add_edges_from(
+            (
+                substation_from_extid[substation_from].name,
+                substation_from_extid[substation_to].name,
+                {"object": ac_line_segment_from_extid[a]},
+            )
+            for substation_from, acls in substation_con_ac_line_segments.items()
+            for a in acls
+            for substation_to in ac_line_segment_con_substations[a]
+            if substation_from != substation_to
+        )
+        self.G.add_nodes_from((substation.name, {"object": substation}) for substation in substations)
+
+    @staticmethod
+    def _graph_ac_line_segments(graph, client):
+        return PowerAssetList([obj for f, t, obj in graph.edges(data="object")], cognite_client=client)
+
+    @staticmethod
+    def _graph_substations(graph, client):
+        return PowerAssetList([obj for n, obj in graph.nodes(data="object")], cognite_client=client)
+
+    def substations(self):
+        return self._graph_substations(self.G, self._cognite_client)
+
+    def ac_line_segments(self):
+        return self._graph_ac_line_segments(self.G, self._cognite_client)
 
     def _node_locations(self):
         node_loc = {
-            s: [
-                float(s.metadata.get("PositionPoint.xPosition", math.nan)),
-                float(s.metadata.get("PositionPoint.yPosition", math.nan)),
+            name: [
+                float(substation.metadata.get("PositionPoint.xPosition", math.nan)),
+                float(substation.metadata.get("PositionPoint.yPosition", math.nan)),
             ]
-            for s in self.G.nodes
+            for name, substation in self.G.nodes(data="object")
         }
         orphan_count = 0
         for it in range(2):
@@ -87,8 +110,30 @@ class PowerGraph:
                         orphan_count += 1
         return node_loc
 
-    def select_region(self, nodes):
-        return PowerGraph(nodes, self)
+    def _subgraph(self, nodes):
+        nodes = [n.name if isinstance(n, (Asset)) else n for n in nodes]
+        return PowerGraph(self._cognite_client, nodes, self.full_graph)
 
-    def draw(self):
-        nx.draw(self.G, labels={n: n.name for n in self.G.nodes()}, font_size=30, pos=self._node_locations())
+    def select_region(self, nodes):
+        return self._subgraph(nodes)
+
+    def expand_region(self, level=1):
+        level_nodes = self.G.nodes
+        visited_nodes = set(level_nodes)
+        for _ in range(level):
+            level_nodes = {
+                nb for n in level_nodes for nb in nx.neighbors(self.full_graph, n) if nb not in visited_nodes
+            }
+            visited_nodes |= level_nodes
+        return self._subgraph(visited_nodes)
+
+    def interface(self):
+        interface_edges = [(f, t) for f, t in sg.full_graph.edges if (f in sg.G) ^ (t in sg.G)]
+        edge_data = self.full_graph.edges(data="object")
+        return [obj for f, t, obj in edge_data if (f, t) in interface_edges]
+
+    def draw(self, labels="name", **kwargs):
+        args = {"font_size": 25, "pos": self._node_locations()}
+        if labels and labels not in kwargs:
+            args["labels"] = {n: n for n in self.G.nodes}
+        nx.draw(self.G, **{**args, **kwargs})
