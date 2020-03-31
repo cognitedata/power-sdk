@@ -1,4 +1,5 @@
 import math
+from collections import defaultdict
 
 import networkx as nx
 
