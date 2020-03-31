@@ -1,6 +1,7 @@
 import math
 
 import networkx as nx
+from collections import defaultdict
 
 
 class PowerGraph:
