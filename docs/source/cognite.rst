@@ -9,6 +9,9 @@ Create a Power Client object with:
 Read more about the `PowerClient`_ and the functionality it exposes below.
 
 
+SDK Methods
+===========
+
 PowerClient
 -----------
 .. autoclass:: cognite.power.PowerClient
@@ -127,5 +130,15 @@ PowerCorridorComponent
 Exceptions
 ^^^^^^^^^^
 .. automodule:: cognite.power.exceptions
+    :members:
+    :show-inheritance:
+
+Power Graph
+-----------
+Initialize a PowerGraph with all assets using `client.power_graph()`.
+
+PowerGraph
+^^^^^^^^^^
+.. autoclass:: cognite.power.power_graph.PowerGraph
     :members:
     :show-inheritance:

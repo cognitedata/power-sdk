@@ -11,7 +11,7 @@ Cognite Power SDK
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
 This is an extensions package to the [Cognite Python SDK](https://github.com/cognitedata/cognite-sdk-python)
- for developers testing features in development in Cognite Data Fusion (CDF). 
+ for power grid specific applications in Cognite Data Fusion (CDF). 
 
 ## Quickstart
 Import a client with:
