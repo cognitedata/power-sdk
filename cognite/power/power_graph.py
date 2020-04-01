@@ -1,6 +1,6 @@
 import math
 from collections import defaultdict
-from typing import List, Union
+from typing import Iterable, List, Union
 
 import matplotlib
 import networkx as nx
@@ -105,26 +105,30 @@ class PowerGraph:
         """Select a region using a list of substations (or their names)"""
         return self._subgraph(nodes)
 
-    def expand_region(self, level=1) -> "PowerGraph":
+    def expand_region(self, level=1, base_voltage: Iterable = None) -> "PowerGraph":
         """Expand the graph by following line segments `level` times."""
         level_nodes = self.graph.nodes
         visited_nodes = set(level_nodes)
         for _ in range(level):
             level_nodes = {
-                nb for n in level_nodes for nb in nx.neighbors(self.full_graph, n) if nb not in visited_nodes
+                nb
+                for n in level_nodes
+                for nb, data in self.full_graph[n].items()
+                if nb not in visited_nodes and (base_voltage is None or data["object"].base_voltage in base_voltage)
             }
             visited_nodes |= level_nodes
         return self._subgraph(visited_nodes)
 
-    def interface(self) -> PowerAssetList:
+    def interface(self, base_voltage: Iterable = None) -> PowerAssetList:
         """Return the list of ACLineSegments on the edge of the selected region."""
 
         # select edges with either from or to in graph but not both
-        interface_edges = [(f, t) for f, t in self.full_graph.edges if (f in self.graph) ^ (t in self.graph)]
-        edge_data = self.full_graph.edges(data="object")
-        return PowerAssetList(
-            [obj for f, t, obj in edge_data if (f, t) in interface_edges], cognite_client=self._cognite_client
-        )
+        interface_edges = [
+            acl
+            for f, t, acl in self.full_graph.edges(data="object")
+            if (f in self.graph) ^ (t in self.graph) and (base_voltage is None or acl.base_voltage in base_voltage)
+        ]
+        return PowerAssetList(interface_edges, cognite_client=self._cognite_client)
 
     def _node_locations(self):
         node_loc = {
@@ -221,7 +225,7 @@ class PowerGraph:
                 titlefont_size=16,
                 showlegend=False,
                 hovermode="closest",
-                margin=dict(b=20, l=5, r=5, t=40),
+                margin=dict(b=0, l=0, r=0, t=0),
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             ),
