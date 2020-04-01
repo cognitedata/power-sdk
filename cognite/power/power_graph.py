@@ -2,7 +2,11 @@ import math
 from collections import defaultdict
 from typing import List, Union
 
+import matplotlib
 import networkx as nx
+import plotly as py
+import plotly.graph_objs as go
+from matplotlib.colors import LinearSegmentedColormap
 
 from cognite.client.data_classes import Asset
 from cognite.power.data_classes import PowerAsset, PowerAssetList, Substation
@@ -143,30 +147,83 @@ class PowerGraph:
                         orphan_count += 1
         return node_loc
 
-    def draw(self, labels="name", pos="cdf", label_args=None, **kwargs):
+    def draw(self, labels="fixed", position="source"):
         """Plots the graph.
 
         Args:
-            labels: 'name' to label by name, other values are passed to networkx.draw (e.g. `None`)
-            pos: `cdf` to take positions from the assets xPosition/yPosition. `spring` for a networkx spring location. Other values passed to `networkx.draw` directly.
-            label_args: passed to `networkx.draw_networkx_labels`, e.g. {'font_size':10}
-            kwargs: are passed to `networkx.draw`
+            labels: 'fixed' to label by name, otherwise only shown on hovering over node.
+            position: `source` to take positions from the assets xPosition/yPosition. `spring` for a networkx spring location.
         """
-        if pos == "cdf":
-            pos = self._node_locations()
-        elif pos == "spring":
-            pos = nx.spring_layout(self.graph)
+        cmap = LinearSegmentedColormap.from_list("custom blue", ["#ffff00", "#002266"], N=12)
 
-        if labels == "name":
-            labels = {n: n for n in self.graph.nodes}
+        def voltage_color(bv):
+            c = ",".join(map(str, cmap(bv / 500)))
+            return f"rgba({c})"
 
-        draw_args = kwargs
-        nx.draw(self.graph, pos=pos, **draw_args)
-        if labels:
-            ys = {xy[1] for n, xy in nx.spring_layout(self.graph).items()}
-            max_y = max(ys)
-            offset = 0  # (max_y - min(ys)) / 50
-            font_size = 20
-            label_args = {"font_size": font_size, **(label_args or {})}
-            offset_pos = {n: [xy[0], xy[1] + offset] for n, xy in pos.items()}
-            nx.draw_networkx_labels(self.graph, pos=offset_pos, **label_args)
+        if position == "source":
+            node_positions = self._node_locations()
+        elif position == "spring":
+            node_positions = nx.spring_layout(self.graph)
+        else:
+            raise ValueError(f"Unknown layout {position}")
+
+        node_plot_mode = "markers"
+        if labels == "fixed":
+            node_plot_mode = "markers+text"
+
+        # plot each base voltage
+        edges_by_bv = defaultdict(list)
+        for f, t, obj in self.graph.edges(data="object"):
+            edges_by_bv[obj.base_voltage].append((f, t, obj))
+
+        edge_traces = []
+        hidden_edge_nodes = []
+        edge_lbl = []
+        for base_voltage, edge_list in edges_by_bv.items():
+            bv_edge_points = sum([[node_positions[f], node_positions[t], [None, None]] for f, t, obj in edge_list], [])
+            hidden_edge_nodes.extend(
+                [(node_positions[f][0] + node_positions[t][0]) / 2, (node_positions[f][1] + node_positions[t][1]) / 2]
+                for f, t, obj in edge_list
+            )
+            edge_lbl.extend(f"{obj.name}: {obj.base_voltage} kV" for f, t, obj in edge_list)
+            edge_x, edge_y = zip(*bv_edge_points)
+            edge_traces.append(
+                go.Scatter(
+                    x=edge_x,
+                    y=edge_y,
+                    line=dict(width=1.5, color=voltage_color(base_voltage)),
+                    hoverinfo="none",
+                    mode="lines",
+                )
+            )
+
+        edge_node_x, edge_node_y = zip(*hidden_edge_nodes)
+        edge_node_trace = go.Scatter(
+            x=edge_node_x, y=edge_node_y, text=edge_lbl, mode="markers", hoverinfo="text", marker=dict(size=0.001)
+        )
+
+        node_x, node_y = zip(*[xy for lbl, xy in node_positions.items()])
+        node_lbl = [lbl for lbl, xy in node_positions.items()]
+
+        node_trace = go.Scatter(
+            x=node_x,
+            y=node_y,
+            text=node_lbl,
+            mode=node_plot_mode,
+            textposition="top center",
+            hoverinfo="text",
+            marker=dict(size=15, line_width=2, color="orangered"),
+        )
+
+        fig = go.Figure(
+            data=edge_traces + [edge_node_trace, node_trace],
+            layout=go.Layout(
+                titlefont_size=16,
+                showlegend=False,
+                hovermode="closest",
+                margin=dict(b=20, l=5, r=5, t=40),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            ),
+        )
+        return fig
