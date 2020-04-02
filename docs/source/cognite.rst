@@ -135,10 +135,16 @@ Exceptions
 
 Power Graph
 -----------
-Initialize a PowerGraph with all assets using `client.power_graph()`.
+Initialize a PowerGraph with all assets using `client.initialize_power_graph()`. A PowerGraph is also initialized automatically when a PowerArea is created
 
 PowerGraph
 ^^^^^^^^^^
 .. autoclass:: cognite.power.power_graph.PowerGraph
+    :members:
+    :show-inheritance:
+
+PowerArea
+^^^^^^^^^^
+.. autoclass:: cognite.power.power_area.PowerArea
     :members:
     :show-inheritance:

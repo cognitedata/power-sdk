@@ -57,7 +57,11 @@ class PowerClient(CogniteClient):
     #        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
     #        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
 
-    def power_area(self, base_stations: List[str]):
+    def initialize_power_graph(self):
         if not self._graph:
             self._graph = PowerGraph(self)
+
+    def power_area(self, base_stations: List[str]):
+        if not self._graph:
+            self.initialize_power_graph()
         return PowerArea(self, base_stations, self._graph)
