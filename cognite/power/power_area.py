@@ -67,6 +67,7 @@ class PowerArea:
             ]
             for name, substation in self._graph.nodes(data="object")
         }
+        #        orphan_count = 0
         for it in range(2):
             for s, loc in node_loc.items():
                 if math.isnan(loc[0]):
@@ -74,6 +75,9 @@ class PowerArea:
                     mean_loc = [sum(c) / len(nb_locs) for c in zip(*nb_locs)]
                     if len(mean_loc) == 2:
                         node_loc[s] = mean_loc
+        #                    elif it == 1:
+        #                        node_loc[s] = [20, 55 + orphan_count]  # TODO don't hardcode this
+        #                        orphan_count += 1
         return node_loc
 
     def draw(self, labels="fixed", position="source"):
