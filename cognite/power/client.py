@@ -61,6 +61,6 @@ class PowerClient(CogniteClient):
         if not self.power_graph:
             self.power_graph = PowerGraph(self)
 
-    def power_area(self, base_stations: List[str]):
+    def power_area(self, base_stations: List[Union[Substation, str]]):
         self.initialize_power_graph()
         return PowerArea(self, base_stations, self.power_graph)
