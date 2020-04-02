@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cognite-power-sdk"
-version = "0.8.1"
+version = "0.8.3"
 description = "Cognite Power SDK"
 authors = ["Sander Land <sander.land@cognite.com>"]
 
@@ -18,7 +18,7 @@ line_length=120                # corresponds to -w  flag
 multi_line_output=3            # corresponds to -m  flag
 include_trailing_comma=true    # corresponds to -tc flag
 skip_glob = '^((?!py$).)*$'    # this makes sort all Python files
-known_third_party = ["networkx", "numpy", "pandas", "pytest"]
+known_third_party = ["matplotlib", "networkx", "numpy", "pandas", "plotly", "pytest"]
 
 [tool.tox]
 legacy_tox_ini = """
@@ -42,6 +42,8 @@ python = "^3.6.1"
 cognite-sdk-experimental = "^0.4"
 numpy = "^1.18.1"
 networkx = "^2.4"
+matplotlib = "^3.2.1"
+plotly = "^4.5.4"
 
 [tool.poetry.dev-dependencies]
 black = "^19.3b0"

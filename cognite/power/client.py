@@ -51,15 +51,13 @@ class PowerClient(CogniteClient):
         self.analogs = GenericPowerAPI("Analog", self.config, self._API_VERSION, self)
 
         self.power_assets = GenericPowerAPI(None, self.config, self._API_VERSION, self)
-        self._graph = PowerGraph(self)
+        self._graph = None
 
     #        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
     #        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
     #        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
 
-    def power_area(self, base_stations: List[Substation]):
-        return PowerArea(self, base_stations)
-
-    @property
-    def graph(self):
-        return self._graph
+    def power_area(self, base_stations: List[str]):
+        if not self._graph:
+            self._graph = PowerGraph(self)
+        return PowerArea(self, base_stations, self._graph)

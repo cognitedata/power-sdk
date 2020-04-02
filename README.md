@@ -33,4 +33,10 @@ To install this package:
 ```bash
 $ pip install cognite-power-sdk
 ```
-
+For PowerGraph plotting support in Jupyter lab, install the relevant extensions using
+```bash
+jupyter labextension install @jupyter-widgets/jupyterlab-manager --no-build
+jupyter labextension install jupyterlab-plotly --no-build
+jupyter labextension install plotlywidget --no-build
+jupyter lab build
+```
