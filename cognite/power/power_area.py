@@ -161,14 +161,16 @@ class PowerArea:
         )
         return fig
 
-    def expand_area(self, level=1) -> "PowerArea":
+    def expand_area(self, level=1, base_voltage: Iterable = None) -> "PowerArea":
         """Expand the area by following line segments `level` times."""
         level_nodes = self._graph.nodes
         visited_nodes = set(level_nodes)
-        # TODO: this loop does not need to lock at all nodes for each iteration, but I do not want to optimize before we have tests in place
         for _ in range(level):
             level_nodes = {
-                nb for n in level_nodes for nb in nx.neighbors(self._power_graph.graph, n) if nb not in visited_nodes
+                nb
+                for n in level_nodes
+                for nb, data in self._power_graph.graph[n].items()
+                if nb not in visited_nodes and (base_voltage is None or data["object"].base_voltage in base_voltage)
             }
             visited_nodes |= level_nodes
         return PowerArea(self._cognite_client, [node for node in visited_nodes], self._power_graph)
