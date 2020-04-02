@@ -6,7 +6,8 @@ import networkx as nx
 import plotly.graph_objs as go
 from matplotlib.colors import LinearSegmentedColormap
 
-from cognite.power.data_classes import PowerAssetList
+from cognite.client.data_classes import Asset
+from cognite.power.data_classes import PowerAssetList, Substation
 
 
 class PowerArea:
@@ -14,7 +15,8 @@ class PowerArea:
     Describes the electrical grid in a connected set of substations.
     """
 
-    def __init__(self, cognite_client, substations: List[str], power_graph):
+    def __init__(self, cognite_client, substations: List[Union[Substation, str]], power_graph):
+        substations = [n.name if isinstance(n, Asset) else n for n in substations]
         self._cognite_client = cognite_client
         if len(substations) < 1:
             raise ValueError("A power area must have at least one substation")
