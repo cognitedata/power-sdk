@@ -6,7 +6,7 @@ import networkx as nx
 import plotly.graph_objs as go
 from matplotlib.colors import LinearSegmentedColormap
 
-from cognite.power.data_classes import PowerAssetList, Substation
+from cognite.power.data_classes import PowerAssetList
 
 
 class PowerArea:
@@ -14,17 +14,17 @@ class PowerArea:
     Describes the electrical grid in a connected set of substations.
     """
 
-    def __init__(self, cognite_client, substations: List[str], full_graph):
+    def __init__(self, cognite_client, substations: List[str], power_graph):
         self._cognite_client = cognite_client
         if len(substations) < 1:
             raise ValueError("A power area must have at least one substation")
-        self._full_graph = full_graph
+        self._power_graph = power_graph
         self._graph = nx.Graph()
-        all_nodes = self._full_graph.nodes(data=True)
+        all_nodes = self._power_graph.graph.nodes(data=True)
         self._graph.add_nodes_from((k, all_nodes[k]) for k in substations)
         self._graph.add_edges_from(
             (n, nbr, d)
-            for n, nbrs in self._full_graph.adj.items()
+            for n, nbrs in self._power_graph.graph.adj.items()
             if n in substations
             for nbr, d in nbrs.items()
             if nbr in substations
@@ -54,7 +54,7 @@ class PowerArea:
         # select edges with either from or to in graph but not both
         interface_edges = [
             acl
-            for f, t, acl in self._full_graph.edges(data="object")
+            for f, t, acl in self._power_graph.graph.edges(data="object")
             if (f in self._graph) ^ (t in self._graph) and (base_voltage is None or acl.base_voltage in base_voltage)
         ]
         return PowerAssetList(interface_edges, cognite_client=self._cognite_client)
@@ -67,7 +67,7 @@ class PowerArea:
             ]
             for name, substation in self._graph.nodes(data="object")
         }
-        orphan_count = 0
+#        orphan_count = 0
         for it in range(2):
             for s, loc in node_loc.items():
                 if math.isnan(loc[0]):
@@ -75,9 +75,9 @@ class PowerArea:
                     mean_loc = [sum(c) / len(nb_locs) for c in zip(*nb_locs)]
                     if len(mean_loc) == 2:
                         node_loc[s] = mean_loc
-                    elif it == 1:
-                        node_loc[s] = [20, 55 + orphan_count]  # TODO don't hardcode this
-                        orphan_count += 1
+#                    elif it == 1:
+#                        node_loc[s] = [20, 55 + orphan_count]  # TODO don't hardcode this
+#                        orphan_count += 1
         return node_loc
 
     def draw(self, labels="fixed", position="source"):
@@ -170,8 +170,8 @@ class PowerArea:
             level_nodes = {
                 nb
                 for n in level_nodes
-                for nb in nx.neighbors(self._cognite_client.graph.graph, n)
+                for nb in nx.neighbors(self._power_graph.graph, n)
                 if nb not in visited_nodes
             }
             visited_nodes |= level_nodes
-        return PowerArea(self._cognite_client, [node for node in visited_nodes])
+        return PowerArea(self._cognite_client, [node for node in visited_nodes], self._power_graph)
