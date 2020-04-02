@@ -1,6 +1,10 @@
+from typing import *
+
 from cognite.experimental import CogniteClient
 from cognite.power._api.generic_power import GenericPowerAPI
 from cognite.power._api.power_transformer_ends_api import PowerTransformerEndsAPI
+from cognite.power.data_classes import Substation
+from cognite.power.power_area import PowerArea
 from cognite.power.power_graph import PowerGraph
 
 
@@ -47,11 +51,16 @@ class PowerClient(CogniteClient):
         self.analogs = GenericPowerAPI("Analog", self.config, self._API_VERSION, self)
 
         self.power_assets = GenericPowerAPI(None, self.config, self._API_VERSION, self)
+        self.power_graph = None
 
     #        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
     #        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
     #        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
 
-    def power_graph(self) -> PowerGraph:
-        """Returns a PowerGraph with all assets"""
-        return PowerGraph(self)
+    def initialize_power_graph(self):
+        if not self.power_graph:
+            self.power_graph = PowerGraph(self)
+
+    def power_area(self, base_stations: List[Union[Substation, str]]):
+        self.initialize_power_graph()
+        return PowerArea(self, base_stations, self.power_graph)
