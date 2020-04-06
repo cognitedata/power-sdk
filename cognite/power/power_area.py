@@ -43,16 +43,10 @@ class PowerArea:
     ):
         """Creates a power area from a list of ac line segments, interpreted as the interface of the area, as well as an interior substation"""
         interior_station = interior_station.name if isinstance(interior_station, Substation) else interior_station
+        ac_line_segments = [acls.name if isinstance(acls, Asset) else acls for acls in ac_line_segments]
 
         acls_edge_map = {edge[2]["object"].name: (edge[0], edge[1]) for edge in power_graph.graph.edges.data()}
-        interface_edges = [
-            acls_edge_map[acls]
-            if isinstance(acls, str)
-            else acls_edge_map[acls.name]
-            if isinstance(acls, Asset)
-            else acls
-            for acls in ac_line_segments
-        ]
+        interface_edges = [acls_edge_map[acls] if isinstance(acls, str) else acls for acls in ac_line_segments]
         temp_graph = power_graph.graph.copy()
         for edge in interface_edges:
             temp_graph.remove_edge(edge[0], edge[1])
