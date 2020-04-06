@@ -308,7 +308,9 @@ class PowerAssetList(AssetList):
                 return self._cognite_client.power_area(self)
             elif self.type == "ACLineSegment":
                 if interior_substation:
-                    return self._cognite_client.power_area(ac_line_segments=self, interior_substation=interior_substation)
+                    return self._cognite_client.power_area(
+                        ac_line_segments=self, interior_substation=interior_substation
+                    )
                 else:
                     raise ValueError("Need an substation on the interior of the area to create from ac line segments.")
             else:
