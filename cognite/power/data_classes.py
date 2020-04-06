@@ -82,7 +82,13 @@ class PowerAsset(Asset):
     @staticmethod
     def _load_from_asset(asset, class_name, cognite_client):
         cls = _str_to_class(class_name) or PowerAsset
-        return cls(cognite_client=cognite_client, **asset.dump())
+        power_asset = cls(cognite_client=cognite_client, **asset.dump())
+        if cls is not PowerAsset:
+            assert power_asset.type in [
+                None,
+                class_name,
+            ], f"Tried to load an asset {power_asset.type} as a {cls.__name__}"
+        return power_asset
 
     @staticmethod
     def _sequence_number_filter(sequence_number) -> Optional[Callable]:
@@ -240,6 +246,14 @@ class WindGeneratingUnit(GeneratingUnit):
 
 
 class HydroGeneratingUnit(GeneratingUnit):
+    pass
+
+
+class ThermalGeneratingUnit(GeneratingUnit):
+    pass
+
+
+class ConformLoad(PowerAsset):
     pass
 
 
@@ -455,6 +469,41 @@ class PowerAssetList(AssetList):
         else:
             raise WrongPowerTypeError(f"Can't get PowerTransformers for a list of {self.type}")
 
+    def generating_units(self, power_type: Optional[Union[str, List[str]]] = None) -> "PowerAssetList":
+        """Shortcut for finding the associated GeneratingUnit for a list of Substations
+
+        Args:
+            power_type: type of generating unit, default is ["HydroGeneratingUnit","WindGeneratingUnit","ThermalGeneratingUnit"] """
+        if power_type is None:
+            power_type = ["HydroGeneratingUnit", "WindGeneratingUnit", "ThermalGeneratingUnit"]
+        if isinstance(power_type, str):
+            power_type = [power_type]
+        if self.has_type("Substation"):
+            return PowerAssetList(
+                sum([self.relationship_sources(pt) for pt in power_type], []), cognite_client=self._cognite_client,
+            )
+        elif not self.data:
+            return PowerAssetList([], cognite_client=self._cognite_client)
+        else:
+            raise WrongPowerTypeError(f"Can't get Generating Units [{power_type}] for a list of {self.type}")
+
+    def hydro_generating_units(self, grid_type: Optional[str] = None) -> "PowerAssetList":
+        return self.generating_units("HydroGeneratingUnit")
+
+    def wind_generating_units(self, grid_type: Optional[str] = None) -> "PowerAssetList":
+        return self.generating_units("WindGeneratingUnit")
+
+    def thermal_generating_units(self, grid_type: Optional[str] = None) -> "PowerAssetList":
+        return self.generating_units("ThermalGeneratingUnit")
+
+    def conform_loads(self, base_voltage: Iterable = None) -> "PowerAssetList":
+        if self.has_type("Substation"):
+            return self.relationship_sources("ConformLoad", base_voltage=base_voltage)
+        elif not self.data:
+            return PowerAssetList([], cognite_client=self._cognite_client)
+        else:
+            raise WrongPowerTypeError(f"Can't get ConformLoads for a list of {self.type}")
+
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the associated Substations for a list of PowerTransformer, ACLineSegment or Terminal"""
         if self.has_type("PowerTransformer") or self.has_type("Terminal"):
@@ -462,7 +511,7 @@ class PowerAssetList(AssetList):
         elif self.has_type("ACLineSegment"):
             return self.terminals().substations()
         elif not self.data:
-            return PowerAssetList([])
+            return PowerAssetList([], cognite_client=self._cognite_client)
         else:
             raise WrongPowerTypeError(f"Can't get substations for a list of {self.type}")
 
@@ -475,7 +524,7 @@ class PowerAssetList(AssetList):
                 "ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage, grid_type=grid_type
             )
         elif not self.data:
-            return PowerAssetList([])
+            return PowerAssetList([], cognite_client=self._cognite_client)
         else:
             raise WrongPowerTypeError(f"Can't get ACLineSegments for a list of {self.type}")
 

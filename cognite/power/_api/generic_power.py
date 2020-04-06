@@ -172,3 +172,13 @@ class GenericPowerAPI(AssetsAPI):
                 [self.retrieve_name(name=n, asset_type=asset_type, bidding_area=bidding_area) for n in name],
                 cognite_client=self._cognite_client,
             )
+
+    def retrieve(self, *args, **kwargs) -> Optional[PowerAsset]:
+        asset = super().retrieve(*args, **kwargs)
+        if asset:
+            return PowerAsset._load_from_asset(asset, self.power_type, self._cognite_client)
+
+    def retrieve_multiple(self, *args, **kwargs) -> PowerAssetList:
+        return PowerAssetList._load_assets(
+            super().retrieve_multiple(*args, **kwargs), self.power_type, self._cognite_client
+        )
