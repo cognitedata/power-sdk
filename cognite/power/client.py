@@ -3,7 +3,7 @@ from typing import *
 from cognite.experimental import CogniteClient
 from cognite.power._api.generic_power import GenericPowerAPI
 from cognite.power._api.power_transformer_ends_api import PowerTransformerEndsAPI
-from cognite.power.data_classes import Substation
+from cognite.power.data_classes import ACLineSegment, Substation
 from cognite.power.power_area import PowerArea
 from cognite.power.power_graph import PowerGraph
 
@@ -65,6 +65,18 @@ class PowerClient(CogniteClient):
         if not self.power_graph:
             self.power_graph = PowerGraph(self)
 
-    def power_area(self, base_stations: List[Union[Substation, str]]):
+    def power_area(
+        self,
+        substations: List[Union[Substation, str]] = None,
+        ac_line_segments: List[Union[ACLineSegment, str, Tuple[str, str]]] = None,
+        interior_substation: Substation = None,
+    ):
         self.initialize_power_graph()
-        return PowerArea(self, base_stations, self.power_graph)
+        if substations:
+            return PowerArea(self, substations, self.power_graph)
+        elif ac_line_segments and interior_substation:
+            return PowerArea.from_interface(self, self.power_graph, ac_line_segments, interior_substation)
+        else:
+            raise ValueError(
+                "Need either a list of substations or a list of ac_line_segments plus an interior substation to define an area"
+            )

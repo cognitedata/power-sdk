@@ -296,7 +296,10 @@ class PowerAssetList(AssetList):
         """Type of the list of assets, will raise a MixedPowerAssetListException if the list contains several asset types."""
         if not self.data:
             return None
+
         types = list({a.type for a in self.data})
+        if None in types:
+            raise MixedPowerAssetListException("One or more assets do not have a valid power type")
         if len(types) != 1:
             raise MixedPowerAssetListException(
                 f"Can not determine type of list with assets of types {', '.join(types)}"
@@ -312,6 +315,22 @@ class PowerAssetList(AssetList):
         for asset in self.data:
             type_to_assets[asset.type].append(asset)
         return type_to_assets
+
+    def to_power_area(self, interior_substation: Union[str, Substation] = None):
+        try:
+            if self.type == "Substation":
+                return self._cognite_client.power_area(self)
+            elif self.type == "ACLineSegment":
+                if interior_substation:
+                    return self._cognite_client.power_area(
+                        ac_line_segments=self, interior_substation=interior_substation
+                    )
+                else:
+                    raise ValueError("Need an substation on the interior of the area to create from ac line segments.")
+            else:
+                raise ValueError("PowerArea can only be created from a list of Substations, not {}s.".format(self.type))
+        except MixedPowerAssetListException as e:
+            raise ValueError("PowerArea can only be created from a list of Substations, not mixed power assets.") from e
 
     @staticmethod
     def _load_assets(
