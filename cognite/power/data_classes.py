@@ -228,6 +228,7 @@ class PowerTransformerEnd(PowerAsset):
             return None
 
     def opposite_end(self):
+        """Gets the PowerTransformerEnd's opposite end (end number 1->2 and 2->1)"""
         end_number = self.end_number
         if end_number not in [1, 2]:
             raise ValueError(
@@ -313,6 +314,19 @@ class PowerAssetList(AssetList):
             type_to_assets[asset.type].append(asset)
         return type_to_assets
 
+    def filter(
+        cognite_client, base_voltage: Iterable = None, grid_type: str = None, x_filter: Callable = None,
+    ) -> "PowerAssetList":
+        """Filters list by grid type, base_voltage or arbitrary function of asset->bool"""
+        power_assets = self.data
+        if x_filter:
+            power_assets = [a for a in power_assets if x_filter(a)]
+        if base_voltage is not None:
+            power_assets = [a for a in power_assets if a.base_voltage in base_voltage]
+        if grid_type is not None:
+            power_assets = [a for a in power_assets if a.grid_type == grid_type]
+        return PowerAssetList(power_assets, cognite_client=self._cognite_client)
+
     @staticmethod
     def _load_assets(
         assets,
@@ -323,13 +337,9 @@ class PowerAssetList(AssetList):
         x_filter: Callable = None,
     ) -> "PowerAssetList":
         power_assets = [PowerAsset._load_from_asset(a, class_name, cognite_client) for a in assets]
-        if x_filter:
-            power_assets = [a for a in power_assets if x_filter(a)]
-        if base_voltage is not None:
-            power_assets = [a for a in power_assets if a.base_voltage in base_voltage]
-        if grid_type is not None:
-            power_assets = [a for a in power_assets if a.grid_type == grid_type]
-        return PowerAssetList(power_assets, cognite_client=cognite_client)
+        return PowerAssetList(power_assets, cognite_client=cognite_client).filter(
+            base_voltage=base_voltage, grid_type=grid_type, x_filter=x_filter
+        )
 
     @staticmethod
     def _filter_and_convert(
@@ -468,13 +478,16 @@ class PowerAssetList(AssetList):
         else:
             raise WrongPowerTypeError(f"Can't get Generating Units [{power_type}] for a list of {self.type}")
 
-    def hydro_generating_units(self, grid_type: Optional[str] = None) -> "PowerAssetList":
+    def hydro_generating_units(self) -> "PowerAssetList":
+        """Shortcut for finding the associated HydroGeneratingUnits for a list of Substations"""
         return self.generating_units("HydroGeneratingUnit")
 
-    def wind_generating_units(self, grid_type: Optional[str] = None) -> "PowerAssetList":
+    def wind_generating_units(self) -> "PowerAssetList":
+        """Shortcut for finding the associated WindGeneratingUnits for a list of Substations"""
         return self.generating_units("WindGeneratingUnit")
 
-    def thermal_generating_units(self, grid_type: Optional[str] = None) -> "PowerAssetList":
+    def thermal_generating_units(self) -> "PowerAssetList":
+        """Shortcut for finding the associated ThermalGeneratingUnits for a list of Substations"""
         return self.generating_units("ThermalGeneratingUnit")
 
     def conform_loads(self, base_voltage: Iterable = None) -> "PowerAssetList":
