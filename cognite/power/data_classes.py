@@ -315,7 +315,7 @@ class PowerAssetList(AssetList):
         return type_to_assets
 
     def filter(
-        cognite_client, base_voltage: Iterable = None, grid_type: str = None, x_filter: Callable = None,
+        self, base_voltage: Iterable = None, grid_type: str = None, x_filter: Callable = None,
     ) -> "PowerAssetList":
         """Filters list by grid type, base_voltage or arbitrary function of asset->bool"""
         power_assets = self.data
