@@ -7,7 +7,7 @@ import plotly.graph_objs as go
 from matplotlib.colors import LinearSegmentedColormap
 
 from cognite.client.data_classes import Asset
-from cognite.power.data_classes import PowerAssetList, Substation
+from cognite.power.data_classes import ACLineSegment, PowerAssetList, Substation
 
 
 class PowerArea:
@@ -31,8 +31,29 @@ class PowerArea:
             for nbr, d in nbrs.items()
             if nbr in substations
         )
-        if not nx.is_connected(self._graph):
-            raise ValueError("The supplied substations are not connected.")
+
+    @classmethod
+    def from_interface(
+        cls,
+        cognite_client,
+        power_graph,
+        ac_line_segments: List[ACLineSegment],
+        interior_station: Union[Substation, str],
+        base_voltage: Iterable = None,
+    ):
+        """Creates a power area from a list of ac line segments, interpreted as the interface of the area, as well as an interior substation"""
+        interior_station = interior_station.name if isinstance(interior_station, Substation) else interior_station
+        interface_edges = [[s.name for s in acls.substations()] for acls in ac_line_segments]
+        temp_graph = power_graph.graph.copy()
+        for edge in interface_edges:
+            temp_graph.remove_edge(edge[0], edge[1])
+        nodes = PowerArea._expand_area(
+            temp_graph, nodes=[interior_station], level=len(temp_graph), base_voltage=base_voltage
+        )
+        for edge in interface_edges:
+            if edge[0] in nodes and edge[1] in nodes:
+                raise ValueError("Inconsistent interface. The interface must create an isolated zone.")
+        return cls(cognite_client, [n for n in nodes], power_graph)
 
     @staticmethod
     def _graph_substations(graph, client):
@@ -69,7 +90,7 @@ class PowerArea:
             ]
             for name, substation in self._graph.nodes(data="object")
         }
-        #        orphan_count = 0
+        orphan_count = 0
         for it in range(2):
             for s, loc in node_loc.items():
                 if math.isnan(loc[0]):
@@ -77,9 +98,9 @@ class PowerArea:
                     mean_loc = [sum(c) / len(nb_locs) for c in zip(*nb_locs)]
                     if len(mean_loc) == 2:
                         node_loc[s] = mean_loc
-        #                    elif it == 1:
-        #                        node_loc[s] = [20, 55 + orphan_count]  # TODO don't hardcode this
-        #                        orphan_count += 1
+                    elif it == 1:
+                        node_loc[s] = [20, 55 + orphan_count]  # TODO don't hardcode this
+                        orphan_count += 1
         return node_loc
 
     def draw(self, labels="fixed", position="source"):
@@ -163,16 +184,24 @@ class PowerArea:
         )
         return fig
 
-    def expand_area(self, level=1, base_voltage: Iterable = None) -> "PowerArea":
-        """Expand the area by following line segments `level` times."""
-        level_nodes = self._graph.nodes
-        visited_nodes = set(level_nodes)
+    @staticmethod
+    def _expand_area(networkx_graph, nodes, level, base_voltage):
+        visited_nodes = set(nodes)
+        level_nodes = nodes
         for _ in range(level):
             level_nodes = {
                 nb
                 for n in level_nodes
-                for nb, data in self._power_graph.graph[n].items()
+                for nb, data in networkx_graph[n].items()
                 if nb not in visited_nodes and (base_voltage is None or data["object"].base_voltage in base_voltage)
             }
             visited_nodes |= level_nodes
-        return PowerArea(self._cognite_client, [node for node in visited_nodes], self._power_graph)
+        return visited_nodes
+
+    def expand_area(self, level=1, base_voltage: Iterable = None) -> "PowerArea":
+        """Expand the area by following line segments `level` times."""
+        nodes = self._expand_area(self._power_graph.graph, self._graph.nodes, level, base_voltage)
+        return PowerArea(self._cognite_client, [node for node in nodes], self._power_graph)
+
+    def is_connected(self) -> bool:
+        return nx.is_connected(self._graph)
