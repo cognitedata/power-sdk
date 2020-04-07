@@ -31,10 +31,10 @@ class GenericPowerAPI(AssetsAPI):
         if bidding_area:
             if isinstance(bidding_area, str):
                 bidding_area = [bidding_area]
-            downcased_bidding_area = [name.upper() for name in bidding_area]
-            subtree_assets = [a for a in self._all_bidding_area() if a.name.upper() in downcased_bidding_area]
+            upcased_bidding_area = [name.upper() for name in bidding_area]
+            subtree_assets = [a for a in self._all_bidding_area() if a.name.upper() in upcased_bidding_area]
             found_names = [a.name.upper() for a in subtree_assets]
-            not_found = set(downcased_bidding_area) - set(found_names)
+            not_found = set(upcased_bidding_area) - set(found_names)
             if not_found:
                 raise ValueError(
                     f"Bidding area(s) {not_found} not found - should be one of {[a.name.upper() for a in self._all_bidding_area()]} (case insensitive)"
