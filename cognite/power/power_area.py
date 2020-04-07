@@ -4,10 +4,20 @@ from typing import *
 
 import networkx as nx
 import plotly.graph_objs as go
+import pyproj
 from matplotlib.colors import LinearSegmentedColormap
 
 from cognite.client.data_classes import Asset
 from cognite.power.data_classes import ACLineSegment, PowerAssetList, Substation
+
+# univeral transverse mercator zone 32 = south norway, germany
+_LATLON_PROJ = "+proj=utm +zone=32, +north +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+_PROJECTION = pyproj.Proj(_LATLON_PROJ, preserve_units=True)
+
+
+def _latlon_to_xy(lat, lon):
+    (x, y) = _PROJECTION(lat, lon)
+    return (x, y)
 
 
 class PowerArea:
@@ -106,23 +116,52 @@ class PowerArea:
                         orphan_count += 1
         return node_loc
 
-    def draw(self, labels="fixed", position="source"):
+    def draw(self, labels="fixed", position="project", height=None):
         """Plots the graph.
 
         Args:
             labels: 'fixed' to label by name, otherwise only shown on hovering over node.
-            position: `source` to take positions from the assets xPosition/yPosition. `spring` for a networkx spring location.
+            position: `source` to take positions from the assets xPosition/yPosition.
+                      `project` to take positions from source and project them to meters east/north.
+                      `spring` for a networkx spring location.
+                      `kamada` for a networkx kamada-kawai location.
+            height: figure height (width is set based on fixed aspect ratio)
         """
         cmap = LinearSegmentedColormap.from_list("custom blue", ["#ffff00", "#002266"], N=12)
 
         def voltage_color(bv):
-            c = ",".join(map(str, cmap(bv / 500)))
-            return f"rgba({c})"
+            color_map = [
+                (-1e9, "000000"),
+                (100, "000000"),
+                (132, "9ACA3C"),
+                (300, "20B3DE"),
+                (420, "ED1C24"),
+                (1e9, "ED1C24"),
+            ]
+            color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
+
+            ix_above = 0
+            while color_map[ix_above][0] < bv:
+                ix_above += 1
+            t = (bv - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
+            color = [
+                int(
+                    color_map[ix_above - 1][1][rgb]
+                    + t * (color_map[ix_above][1][rgb] - color_map[ix_above - 1][1][rgb])
+                )
+                for rgb in range(3)
+            ]
+            c = ",".join(map(str, color))
+            return f"rgb({c})"
 
         if position == "source":
             node_positions = self._node_locations()
+        elif position == "project":
+            node_positions = {n: _latlon_to_xy(*xy) for n, xy in self._node_locations().items()}
         elif position == "spring":
             node_positions = nx.spring_layout(self._graph)
+        elif position == "kamada":
+            node_positions = nx.kamada_kawai_layout(self._graph)
         else:
             raise ValueError(f"Unknown layout {position}")
 
@@ -144,13 +183,13 @@ class PowerArea:
                 [(node_positions[f][0] + node_positions[t][0]) / 2, (node_positions[f][1] + node_positions[t][1]) / 2]
                 for f, t, obj in edge_list
             )
-            edge_lbl.extend(f"{obj.name}: {obj.base_voltage} kV" for f, t, obj in edge_list)
+            edge_lbl.extend(f"{obj.name}: {obj.base_voltage:.0f} kV" for f, t, obj in edge_list)
             edge_x, edge_y = zip(*bv_edge_points)
             edge_traces.append(
                 go.Scatter(
                     x=edge_x,
                     y=edge_y,
-                    line=dict(width=1.5, color=voltage_color(base_voltage)),
+                    line=dict(width=2, color=voltage_color(base_voltage)),
                     hoverinfo="none",
                     mode="lines",
                 )
@@ -171,18 +210,20 @@ class PowerArea:
             mode=node_plot_mode,
             textposition="top center",
             hoverinfo="text",
-            marker=dict(size=15, line_width=2, color="orangered"),
+            marker=dict(size=15, line=dict(color="rgb(85,150,210)", width=2), color="rgb(230,230,230)"),
         )
 
         fig = go.Figure(
             data=edge_traces + [edge_node_trace, node_trace],
             layout=go.Layout(
+                height=height,
+                plot_bgcolor="rgb(250,250,250)",
                 titlefont_size=16,
                 showlegend=False,
                 hovermode="closest",
                 margin=dict(b=0, l=0, r=0, t=0),
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, constrain="domain"),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, scaleanchor="x"),
             ),
         )
         return fig

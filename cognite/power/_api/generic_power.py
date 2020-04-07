@@ -1,3 +1,4 @@
+import functools
 import math
 from typing import *
 
@@ -14,6 +15,7 @@ class GenericPowerAPI(AssetsAPI):
         self.grid_type_field_name = grid_type_field
         super().__init__(config, api_version, cognite_client)
 
+    @functools.lru_cache(maxsize=1)
     def _all_bidding_area(self):
         return self._cognite_client.assets.list(metadata={"type": "BiddingArea"})
 
@@ -29,11 +31,14 @@ class GenericPowerAPI(AssetsAPI):
         if bidding_area:
             if isinstance(bidding_area, str):
                 bidding_area = [bidding_area]
-            subtree_assets = [a for a in self._all_bidding_area() if a.name in bidding_area]
-            found_names = [a.name for a in subtree_assets]
-            not_found = set(bidding_area) - set(found_names)
+            upcased_bidding_area = [name.upper() for name in bidding_area]
+            subtree_assets = [a for a in self._all_bidding_area() if a.name.upper() in upcased_bidding_area]
+            found_names = [a.name.upper() for a in subtree_assets]
+            not_found = set(upcased_bidding_area) - set(found_names)
             if not_found:
-                raise ValueError(f"Bidding area(s) {not_found} not found")
+                raise ValueError(
+                    f"Bidding area(s) {not_found} not found - should be one of {[a.name.upper() for a in self._all_bidding_area()]} (case insensitive)"
+                )
             if wrap_ids:
                 filters["asset_subtree_ids"] = [{"id": a.id} for a in subtree_assets]
             else:
@@ -63,7 +68,7 @@ class GenericPowerAPI(AssetsAPI):
         Args:
             grid_type (str): filters on Equipment.gridType. Can give "GridTypeKind.regional" or just "regional" etc.
             base_voltage (Iterable): filters on BaseVoltage_nominalVoltage in the given range or list.
-            bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
+            bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this (case-insensitive) name.
             asset_type (Union[str, List[str]]): filter on these asset types. Automatically populated for specific APIs
             kwargs: all other parameters for the normal AssetsAPI.list method
 
