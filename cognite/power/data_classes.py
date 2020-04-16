@@ -179,6 +179,31 @@ class Substation(PowerAsset):
         """Shortcut for finding the connected ACLineSegments for a substation"""
         return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
 
+    def generating_units(self, power_type: Optional[Union[str, List[str]]] = None) -> "PowerAssetList":
+        """Shortcut for finding the associated GeneratingUnit for a Substation
+
+        Args:
+            power_type: type of generating unit, default is ["HydroGeneratingUnit","WindGeneratingUnit","ThermalGeneratingUnit"] """
+        if power_type is None:
+            power_type = ["HydroGeneratingUnit", "WindGeneratingUnit", "ThermalGeneratingUnit"]
+        if isinstance(power_type, str):
+            power_type = [power_type]
+        return PowerAssetList(
+            sum([self.relationship_sources(pt) for pt in power_type], []), cognite_client=self._cognite_client,
+        )
+
+    def hydro_generating_units(self) -> "PowerAssetList":
+        """Shortcut for finding the associated HydroGeneratingUnits for a Substation"""
+        return self.generating_units("HydroGeneratingUnit")
+
+    def wind_generating_units(self) -> "PowerAssetList":
+        """Shortcut for finding the associated WindGeneratingUnits for a Substation"""
+        return self.generating_units("WindGeneratingUnit")
+
+    def thermal_generating_units(self) -> "PowerAssetList":
+        """Shortcut for finding the associated ThermalGeneratingUnits for a list of Substations"""
+        return self.generating_units("ThermalGeneratingUnit")
+
     def connected_substations(self, *args, **kwargs) -> "PowerAssetList":
         """See PowerAssetList.connected_substations"""
         return PowerAssetList([self], cognite_client=self._cognite_client).connected_substations(*args, **kwargs)
