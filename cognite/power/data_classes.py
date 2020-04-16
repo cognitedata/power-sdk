@@ -264,7 +264,9 @@ class PowerTransformerEnd(PowerAsset):
 
 
 class GeneratingUnit(PowerAsset):
-    pass
+    def synchronous_machines(self) -> "PowerAssetList":
+        """Shortcut for finding the associated SynchronousMachines for a list of generating units. NB: does not check types."""
+        return self.relationship_sources("SynchronousMachine")
 
 
 class WindGeneratingUnit(GeneratingUnit):
@@ -522,6 +524,10 @@ class PowerAssetList(AssetList):
         else:
             raise WrongPowerTypeError(f"Can't get Generating Units [{power_type}] for a list of {self.type}")
 
+    def synchronous_machines(self) -> "PowerAssetList":
+        """Shortcut for finding the associated SynchronousMachines for a list of generating units. NB: does not check types."""
+        return self.relationship_sources("SynchronousMachine")
+
     def hydro_generating_units(self) -> "PowerAssetList":
         """Shortcut for finding the associated HydroGeneratingUnits for a list of Substations"""
         return self.generating_units("HydroGeneratingUnit")
@@ -647,7 +653,7 @@ class PowerAssetList(AssetList):
                 grid_type:  only consider ACLineSegments of this grid type
         """
         if exact and include_lines:
-            raise ArgumentError("Can not include lines for when an exact distance is requested")
+            raise ValueError("Can not include lines when an exact distance is requested")
         if not self.has_type("Substation"):
             raise WrongPowerTypeError(f"Can't get connected substations for a list of {self.type}")
         visited_substations = set(self.data)
