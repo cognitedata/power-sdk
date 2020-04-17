@@ -2,6 +2,8 @@ from collections import defaultdict
 
 import networkx as nx
 
+from cognite.power.data_classes import PowerAsset
+
 
 class PowerGraph:
     def __init__(self, cognite_client):
@@ -24,11 +26,17 @@ class PowerGraph:
         ):
             terminal_con_ac_line_segments[rel.source["resourceId"]].append(rel.target["resourceId"])
 
-        for check_terminal in self._cognite_client.assets.retrieve_multiple(
+        terminals = self._cognite_client.assets.retrieve_multiple(
             external_ids=list(terminal_con_ac_line_segments.keys())
-        ):
+        )
+        terminal_from_extid = {}
+        for check_terminal in terminals:
             if check_terminal.metadata.get("type", None) != "Terminal":
                 del terminal_con_ac_line_segments[check_terminal.external_id]
+            else:
+                terminal_from_extid[check_terminal.external_id] = PowerAsset._load_from_asset(
+                    check_terminal, "Terminal", cognite_client=self._cognite_client
+                )
 
         substation_con_ac_line_segments = defaultdict(list)
         ac_line_segment_con_substations = defaultdict(list)
@@ -40,20 +48,28 @@ class PowerGraph:
             terminal = rel.source["resourceId"]
             if substation in substation_from_extid and terminal in terminal_con_ac_line_segments:
                 ac_line_segments = terminal_con_ac_line_segments.get(terminal, [])
-                substation_con_ac_line_segments[substation].extend(ac_line_segments)
+                substation_con_ac_line_segments[substation].extend(
+                    [(line_segment, terminal) for line_segment in ac_line_segments]
+                )
                 for a in ac_line_segments:
-                    ac_line_segment_con_substations[a].append(substation)
+                    ac_line_segment_con_substations[a].append((substation, terminal))
 
         self.graph = nx.Graph()
         self.graph.add_edges_from(
             (
                 substation_from_extid[substation_from].name,
                 substation_from_extid[substation_to].name,
-                {"object": ac_line_segment_from_extid[a]},
+                {
+                    "object": ac_line_segment_from_extid[line],
+                    "terminals": {  # Note that only one of the edges (a,b) and (b,a) is actually added, so this can not be by order
+                        substation_from_extid[substation_from].name: terminal_from_extid[terminal_from],
+                        substation_from_extid[substation_to].name: terminal_from_extid[terminal_to],
+                    },
+                },
             )
             for substation_from, acls in substation_con_ac_line_segments.items()
-            for a in acls
-            for substation_to in ac_line_segment_con_substations[a]
+            for line, terminal_from in acls
+            for substation_to, terminal_to in ac_line_segment_con_substations[line]
             if substation_from != substation_to
         )
         self.graph.add_nodes_from((substation.name, {"object": substation}) for substation in substations)

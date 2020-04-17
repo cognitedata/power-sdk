@@ -84,16 +84,31 @@ class PowerArea:
         """Returns the list of ACLineSegments in the graph"""
         return self._graph_ac_line_segments(self._graph, self._cognite_client)
 
+    def _interface_edges(self, base_voltage: Iterable = None) -> List:
+        return [  # select edges with either from or to in graph but not both
+            (f, t, data)
+            for f, t, data in self._power_graph.graph.edges(data=True)
+            if (f in self._graph) ^ (t in self._graph)
+            and (base_voltage is None or data["object"].base_voltage in base_voltage)
+        ]
+
     def interface(self, base_voltage: Iterable = None) -> PowerAssetList:
         """Return the list of ACLineSegments going in/out of the area."""
+        ac_line_segments = [data["object"] for f, t, data in self._interface_edges(base_voltage)]
+        return PowerAssetList(ac_line_segments, cognite_client=self._cognite_client)
 
-        # select edges with either from or to in graph but not both
-        interface_edges = [
-            acl
-            for f, t, acl in self._power_graph.graph.edges(data="object")
-            if (f in self._graph) ^ (t in self._graph) and (base_voltage is None or acl.base_voltage in base_voltage)
+    def interface_terminals(self, base_voltage: Iterable = None) -> Tuple[PowerAssetList, PowerAssetList]:
+        """Return the lists of Terminals on the inside and outside of the interface going in/out of the area."""
+        inside_outside_terminals = [
+            (data["terminals"][f], data["terminals"][t])
+            if f in self._graph
+            else (data["terminals"][t], data["terminals"][f])
+            for f, t, data in self._interface_edges(base_voltage)
         ]
-        return PowerAssetList(interface_edges, cognite_client=self._cognite_client)
+        return tuple(
+            PowerAssetList([io[i] for io in inside_outside_terminals], cognite_client=self._cognite_client)
+            for i in [0, 1]
+        )
 
     def _node_locations(self):
         node_loc = {
