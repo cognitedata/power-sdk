@@ -8,8 +8,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import plotly.graph_objs as go
 import pyproj
 from cognite.client.data_classes import Asset
-from cognite.power.data_classes import (ACLineSegment, PowerAssetList,
-                                        Substation)
+from cognite.power.data_classes import *
 
 # univeral transverse mercator zone 32 = south norway, germany
 _LATLON_PROJ = "+proj=utm +zone=32, +north +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
