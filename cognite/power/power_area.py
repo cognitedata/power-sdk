@@ -1,11 +1,12 @@
 import math
 from collections import defaultdict
+from datetime import datetime
 from typing import *
 
 import networkx as nx
+import numpy as np
 import plotly.graph_objs as go
 import pyproj
-from matplotlib.colors import LinearSegmentedColormap
 
 from cognite.client.data_classes import Asset
 from cognite.power.data_classes import ACLineSegment, PowerAssetList, Substation
@@ -131,43 +132,39 @@ class PowerArea:
                         orphan_count += 1
         return node_loc
 
-    def draw(self, labels="fixed", position="project", height=None):
-        """Plots the graph.
+    @staticmethod
+    def _voltage_color(base_voltage: float):
+        color_map = [
+            (-1e9, "000000"),
+            (100, "000000"),
+            (132, "9ACA3C"),
+            (300, "20B3DE"),
+            (420, "ED1C24"),
+            (1e9, "ED1C24"),
+        ]
+        color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
 
-        Args:
-            labels: 'fixed' to label by name, otherwise only shown on hovering over node.
-            position: `source` to take positions from the assets xPosition/yPosition.
-                      `project` to take positions from source and project them to meters east/north.
-                      `spring` for a networkx spring location.
-                      `kamada` for a networkx kamada-kawai location.
-            height: figure height (width is set based on fixed aspect ratio)
-        """
-        cmap = LinearSegmentedColormap.from_list("custom blue", ["#ffff00", "#002266"], N=12)
+        ix_above = 0
+        while color_map[ix_above][0] < base_voltage:
+            ix_above += 1
+        t = (base_voltage - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
+        color = [
+            int(color_map[ix_above - 1][1][rgb] + t * (color_map[ix_above][1][rgb] - color_map[ix_above - 1][1][rgb]))
+            for rgb in range(3)
+        ]
+        c = ",".join(map(str, color))
+        return f"rgb({c})"
 
-        def voltage_color(bv):
-            color_map = [
-                (-1e9, "000000"),
-                (100, "000000"),
-                (132, "9ACA3C"),
-                (300, "20B3DE"),
-                (420, "ED1C24"),
-                (1e9, "ED1C24"),
-            ]
-            color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
+    def _plotly_nodes_edges(self, labels, position):
 
-            ix_above = 0
-            while color_map[ix_above][0] < bv:
-                ix_above += 1
-            t = (bv - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
-            color = [
-                int(
-                    color_map[ix_above - 1][1][rgb]
-                    + t * (color_map[ix_above][1][rgb] - color_map[ix_above - 1][1][rgb])
-                )
-                for rgb in range(3)
-            ]
-            c = ",".join(map(str, color))
-            return f"rgb({c})"
+        if labels == "fixed":
+            node_plot_mode = "markers+text"
+        else:
+            node_plot_mode = "markers"
+        # plot each base voltage
+        edges_by_bv = defaultdict(list)
+        for f, t, obj in self._graph.edges(data="object"):
+            edges_by_bv[obj.base_voltage].append((f, t, obj))
 
         if position == "source":
             node_positions = self._node_locations()
@@ -179,15 +176,6 @@ class PowerArea:
             node_positions = nx.kamada_kawai_layout(self._graph)
         else:
             raise ValueError(f"Unknown layout {position}")
-
-        node_plot_mode = "markers"
-        if labels == "fixed":
-            node_plot_mode = "markers+text"
-
-        # plot each base voltage
-        edges_by_bv = defaultdict(list)
-        for f, t, obj in self._graph.edges(data="object"):
-            edges_by_bv[obj.base_voltage].append((f, t, obj))
 
         edge_traces = []
         hidden_edge_nodes = []
@@ -204,7 +192,7 @@ class PowerArea:
                 go.Scatter(
                     x=edge_x,
                     y=edge_y,
-                    line=dict(width=2, color=voltage_color(base_voltage)),
+                    line=dict(width=2, color=self._voltage_color(base_voltage)),
                     hoverinfo="none",
                     mode="lines",
                 )
@@ -227,9 +215,110 @@ class PowerArea:
             hoverinfo="text",
             marker=dict(size=15, line=dict(color="rgb(85,150,210)", width=2), color="rgb(230,230,230)"),
         )
+        return node_trace, edge_traces, edge_node_trace, node_positions
 
+    def draw(self, labels="fixed", position="project", height=None):
+        """Plots the graph.
+
+        Args:
+            labels: 'fixed' to label by name, otherwise only shown on hovering over node.
+            position: `source` to take positions from the assets xPosition/yPosition.
+                      `project` to take positions from source and project them to meters east/north.
+                      `spring` for a networkx spring location.
+                      `kamada` for a networkx kamada-kawai location.
+            height: figure height (width is set based on fixed aspect ratio)
+        """
+        node_trace, edge_traces, edge_node_trace, _ = self._plotly_nodes_edges(labels, position)
         fig = go.Figure(
             data=edge_traces + [edge_node_trace, node_trace],
+            layout=go.Layout(
+                height=height,
+                plot_bgcolor="rgb(250,250,250)",
+                titlefont_size=16,
+                showlegend=False,
+                hovermode="closest",
+                margin=dict(b=0, l=0, r=0, t=0),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, constrain="domain"),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, scaleanchor="x"),
+            ),
+        )
+        return fig
+
+    @staticmethod
+    def _flow_color(flow: float):
+        color_map = [
+            (-1e9, "ED1C24"),
+            (-100, "ED1C24"),
+            (0, "000000"),
+            (100, "20B3DE"),
+            (1e9, "20B3DE"),
+        ]
+        color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
+
+        ix_above = 0
+        while color_map[ix_above][0] < flow:
+            ix_above += 1
+        t = (flow - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
+        color = [
+            int(color_map[ix_above - 1][1][rgb] + t * (color_map[ix_above][1][rgb] - color_map[ix_above - 1][1][rgb]))
+            for rgb in range(3)
+        ]
+        c = ",".join(map(str, color))
+        return f"rgb({c})"
+
+    def draw_flow(self, labels="fixed", position="project", height=None):
+        node_trace, edge_traces, edge_node_trace, node_positions = self._plotly_nodes_edges(labels, position)
+        terminals = PowerAssetList(
+            list(set(sum([list(data["terminals"].values()) for f, t, data in self._graph.edges(data=True)], []))),
+            cognite_client=self._cognite_client,
+        )
+        ts = terminals.time_series(measurement_type="ThreePhaseActivePower", timeseries_type="estimated_value")
+        analogs = self._cognite_client.assets.retrieve_multiple(ids=[t.asset_id for t in ts])
+        terminal_ids = [a.parent_id for a in analogs]
+
+        df = self._cognite_client.datapoints.retrieve_dataframe(
+            id=[t.id for t in ts],
+            aggregates=["average"],
+            granularity="1h",
+            start=datetime(2019, 1, 1),
+            end=datetime(2020, 1, 1),
+            include_aggregate_name=False,
+        )
+        df.columns = terminal_ids
+
+        target_time = datetime(2019, 3, 1, 10, 30)
+        ix = np.searchsorted(df.index, target_time, side="left")
+        flow_values = df.iloc[ix - 1, :]
+        flow_nodes = []
+        for f, t, data in self._graph.edges(data=True):
+            acl = data["object"]
+            terminal_map = data["terminals"]
+            terminals = [terminal_map[f], terminal_map[t]]
+            for side in [0, 1]:
+                d = {0: 0.15, 1: 0.85}[side]
+                if terminals[side].id in flow_values.index:
+                    val = flow_values[terminals[side].id]  # multiples?
+                    # TODO: multiple values..
+                    if not np.any(np.isnan(val)):
+                        flow_nodes.append(
+                            (
+                                node_positions[f][0] + d * (node_positions[t][0] - node_positions[f][0]),
+                                node_positions[f][1] + d * (node_positions[t][1] - node_positions[f][1]),
+                                flow_values[terminals[side].id],
+                                terminals[side].name,
+                            )
+                        )
+
+        flow_x, flow_y, flow_z, names = zip(*flow_nodes)
+        col = [self._flow_color(z) for z in flow_z]
+        flow_lbl = [f"{n}: {z}" for z, n in zip(flow_z, names)]
+
+        flow_trace = go.Scatter(
+            x=flow_x, y=flow_y, text=flow_lbl, mode="markers", hoverinfo="text", marker=dict(color=col, size=15),
+        )
+
+        fig = go.Figure(
+            data=edge_traces + [edge_node_trace, node_trace, flow_trace],
             layout=go.Layout(
                 height=height,
                 plot_bgcolor="rgb(250,250,250)",
