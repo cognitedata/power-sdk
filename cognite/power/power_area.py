@@ -5,6 +5,7 @@ from typing import *
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 import plotly.graph_objs as go
 import pyproj
 
@@ -247,11 +248,12 @@ class PowerArea:
     @staticmethod
     def _flow_color(flow: float):
         color_map = [
-            (-1e9, "ED1C24"),
-            (-100, "ED1C24"),
-            (0, "000000"),
-            (100, "20B3DE"),
-            (1e9, "20B3DE"),
+            (-1e9, "000000"),
+            (100, "000000"),
+            (132, "9ACA3C"),
+            (300, "20B3DE"),
+            (420, "ED1C24"),
+            (1e9, "ED1C24"),
         ]
         color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
 
@@ -266,7 +268,7 @@ class PowerArea:
         c = ",".join(map(str, color))
         return f"rgb({c})"
 
-    def draw_flow(self, labels="fixed", position="project", height=None):
+    def draw_flow(self, labels="fixed", position="project", height=None, date=None):
         node_trace, edge_traces, edge_node_trace, node_positions = self._plotly_nodes_edges(labels, position)
         terminals = PowerAssetList(
             list(set(sum([list(data["terminals"].values()) for f, t, data in self._graph.edges(data=True)], []))),
@@ -286,39 +288,86 @@ class PowerArea:
         )
         df.columns = terminal_ids
 
-        target_time = datetime(2019, 3, 1, 10, 30)
+        target_time = date or datetime.now()
         ix = np.searchsorted(df.index, target_time, side="left")
         flow_values = df.iloc[ix - 1, :]
-        flow_nodes = []
+
+        distances = [
+            np.linalg.norm(np.array(node_positions[edge[0]]) - np.array(node_positions[edge[1]]))
+            for edge in self._graph.edges
+        ]
+        arrow_scale = min(
+            0.5 * np.min(distances), 0.15 * np.mean(distances)
+        )  # normal 0.1 * mean, but make sure it doesn't go over reasonable min
+
+        arrow_traces = []
         for f, t, data in self._graph.edges(data=True):
             acl = data["object"]
             terminal_map = data["terminals"]
             terminals = [terminal_map[f], terminal_map[t]]
+
+            flow_values_t = []
             for side in [0, 1]:
-                d = {0: 0.15, 1: 0.85}[side]
+                val = np.nan
                 if terminals[side].id in flow_values.index:
-                    val = flow_values[terminals[side].id]  # multiples?
-                    # TODO: multiple values..
-                    if not np.any(np.isnan(val)):
-                        flow_nodes.append(
-                            (
-                                node_positions[f][0] + d * (node_positions[t][0] - node_positions[f][0]),
-                                node_positions[f][1] + d * (node_positions[t][1] - node_positions[f][1]),
-                                flow_values[terminals[side].id],
-                                terminals[side].name,
-                            )
-                        )
+                    val = flow_values[terminals[side].id]
+                    if isinstance(val, pd.Series):
+                        val = val.dropna()
+                        val = val.mean() if not val.empty else np.nan
+                flow_values_t.append(val)
 
-        flow_x, flow_y, flow_z, names = zip(*flow_nodes)
-        col = [self._flow_color(z) for z in flow_z]
-        flow_lbl = [f"{n}: {z}" for z, n in zip(flow_z, names)]
+            from_pos = np.array(node_positions[f])
+            to_pos = np.array(node_positions[t])
+            from_to_vec = to_pos - from_pos
+            from_to_vec /= np.linalg.norm(from_to_vec)
+            if flow_values_t[0] < flow_values_t[1]:
+                flow_vec = -from_to_vec
+            else:
+                flow_vec = from_to_vec
+            orthogonal = np.array([-flow_vec[1], flow_vec[0]])
 
-        flow_trace = go.Scatter(
-            x=flow_x, y=flow_y, text=flow_lbl, mode="markers", hoverinfo="text", marker=dict(color=col, size=15),
-        )
+            mid = (from_pos + to_pos) / 2
+
+            sign_from = math.copysign(1, flow_values_t[0]) if not np.isnan(flow_values_t[0]) else 0
+            arrow_from_mid = mid - 0.5 * arrow_scale * from_to_vec  # arrow middle is always closer to from
+            # direction of arrow depends on sign of flow
+            arrow_from_tail = arrow_from_mid - 0.33 * arrow_scale * flow_vec * sign_from
+            arrow_from_head = arrow_from_mid + 0.33 * arrow_scale * flow_vec * sign_from
+            arrow_from_left = arrow_from_tail - orthogonal * arrow_scale * 0.5
+            arrow_from_right = arrow_from_tail + orthogonal * arrow_scale * 0.5
+
+            sign_to = math.copysign(1, flow_values_t[1]) if not np.isnan(flow_values_t[1]) else 0
+            arrow_to_mid = mid + 0.5 * arrow_scale * from_to_vec  # arrow middle is always closer to to
+            # direction of arrow depends on sign of flow
+            arrow_to_tail = arrow_to_mid - 0.33 * arrow_scale * flow_vec * (-sign_to)
+            arrow_to_head = arrow_to_mid + 0.33 * arrow_scale * flow_vec * (-sign_to)
+            arrow_to_left = arrow_to_tail - orthogonal * arrow_scale * 0.5
+            arrow_to_right = arrow_to_tail + orthogonal * arrow_scale * 0.5
+
+            # print(f, t, arrow_scale, sign_from, sign_to, flow_vec, from_to_vec)
+
+            arrows = [
+                [arrow_from_left, arrow_from_head, arrow_from_right],
+                [arrow_to_left, arrow_to_head, arrow_to_right],
+            ]
+            for arrow_points, terminal, flow in zip(arrows, terminals, flow_values_t):
+                arrow_x, arrow_y = zip(*arrow_points)
+                arrow_traces.append(
+                    go.Scatter(
+                        x=arrow_x,
+                        y=arrow_y,
+                        text=f"{terminal.name}: {flow:.1f} MW" if not np.isnan(flow) else f"{terminal.name}: NO DATA",
+                        line=dict(
+                            width=2,
+                            color=self._flow_color(abs(flow)) if flow and not np.isnan(flow) else "rgb(200,200,200)",
+                        ),
+                        hoverinfo="text",
+                        mode="lines",
+                    )
+                )
 
         fig = go.Figure(
-            data=edge_traces + [edge_node_trace, node_trace, flow_trace],
+            data=edge_traces + [edge_node_trace, node_trace] + arrow_traces,
             layout=go.Layout(
                 height=height,
                 plot_bgcolor="rgb(250,250,250)",
