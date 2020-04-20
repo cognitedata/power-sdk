@@ -2,14 +2,35 @@ from collections import defaultdict
 
 import networkx as nx
 
-from cognite.power.data_classes import PowerAsset
+from cognite.power.data_classes import PowerAsset, PowerAssetList
 
 
 class PowerGraph:
-    def __init__(self, cognite_client):
+    def __init__(self, cognite_client, graph=None):
         """Initializes a power graph. An instance of this is created when creating the first PowerArea, it should not be instantiated elsewhere."""
         self._cognite_client = cognite_client
         self._load()
+
+    def helpful_substation_lookup(self, substation: str):
+        def find_similarly_named_substations(substation: str):
+            """All substations that are one edit away from `substation`."""
+            # from http://norvig.com/spell-correct.html
+            letters = "abcdefghijklmnopqrstuvwxyzæøåABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ"
+            splits = [(substation[:i], substation[i:]) for i in range(len(substation) + 1)]
+            deletes = [L + R[1:] for L, R in splits if R]
+            transposes = [L + R[1] + R[0] + R[2:] for L, R in splits if len(R) > 1]
+            replaces = [L + c + R[1:] for L, R in splits if R for c in letters]
+            inserts = [L + c + R for L, R in splits for c in letters]
+            return set(deletes + transposes + replaces + inserts)
+
+        if substation in self.graph.nodes:
+            return substation, self.graph.nodes(data=True)[substation]
+        else:
+            close_matches = [
+                name for name in list(self.graph.nodes) if name in find_similarly_named_substations(substation)
+            ]
+            helper_message = " Did you mean: {}?".format(close_matches) if len(close_matches) > 0 else ""
+            raise KeyError("Did not find substation '{}'.{}".format(substation, helper_message))
 
     def _load(self):
         substations = self._cognite_client.substations.list()

@@ -3,11 +3,12 @@ from collections import defaultdict
 from typing import *
 
 import networkx as nx
-import plotly.graph_objs as go
-import pyproj
 from matplotlib.colors import LinearSegmentedColormap
 
+import plotly.graph_objs as go
+import pyproj
 from cognite.client.data_classes import Asset
+
 from cognite.power.data_classes import ACLineSegment, PowerAssetList, Substation
 
 # univeral transverse mercator zone 32 = south norway, germany
@@ -32,8 +33,7 @@ class PowerArea:
             raise ValueError("A power area must have at least one substation")
         self._power_graph = power_graph
         self._graph = nx.Graph()
-        all_nodes = self._power_graph.graph.nodes(data=True)
-        self._graph.add_nodes_from((k, all_nodes[k]) for k in substations)
+        self._graph.add_nodes_from(power_graph.helpful_substation_lookup(k) for k in substations)
         self._graph.add_edges_from(
             (n, nbr, d)
             for n, nbrs in self._power_graph.graph.adj.items()
@@ -49,24 +49,32 @@ class PowerArea:
         power_graph,
         ac_line_segments: List[Union[ACLineSegment, str, Tuple[str, str]]],
         interior_station: Union[Substation, str],
+        grid_type: str = None,
         base_voltage: Iterable = None,
     ):
         """Creates a power area from a list of ac line segments, interpreted as the interface of the area, as well as an interior substation"""
         interior_station = interior_station.name if isinstance(interior_station, Substation) else interior_station
         ac_line_segments = [acls.name if isinstance(acls, Asset) else acls for acls in ac_line_segments]
-
         acls_edge_map = {edge[2]["object"].name: (edge[0], edge[1]) for edge in power_graph.graph.edges.data()}
         interface_edges = [acls_edge_map[acls] if isinstance(acls, str) else acls for acls in ac_line_segments]
-        temp_graph = power_graph.graph.copy()
+        # create a copy of the networkx graph, remove the interface edges, use the copy to expand the area:
+        full_networkx_graph = power_graph.graph
+        temp_graph = full_networkx_graph.copy()
         for edge in interface_edges:
             temp_graph.remove_edge(edge[0], edge[1])
-        nodes = PowerArea._expand_area(
-            temp_graph, nodes=[interior_station], level=len(temp_graph), base_voltage=base_voltage
-        )
+        power_graph.graph = temp_graph
+        # some extra safety to ensure we always re-instate the original graph:
+        try:
+            power_area = cls(cognite_client, [interior_station], power_graph).expand_area(
+                level=len(temp_graph), grid_type=grid_type, base_voltage=base_voltage
+            )
+        finally:
+            # re-instate the original networkx graph:
+            power_graph.graph = full_networkx_graph
         for edge in interface_edges:
-            if edge[0] in nodes and edge[1] in nodes:
+            if edge[0] in power_area._graph.nodes and edge[1] in power_area._graph.nodes:
                 raise ValueError("Inconsistent interface. The interface must create an isolated zone.")
-        return cls(cognite_client, [n for n in nodes], power_graph)
+        return power_area
 
     @staticmethod
     def _graph_substations(graph, client):
@@ -243,24 +251,32 @@ class PowerArea:
         )
         return fig
 
-    @staticmethod
-    def _expand_area(networkx_graph, nodes, level, base_voltage):
-        visited_nodes = set(nodes)
-        level_nodes = nodes
+    def _find_neighbors(self, substation, grid_type, base_voltage):
+        """finds the neighbors of a substation, permitted by filter values"""
+        # This is clunky but allows us to not re-implement the logic of filters in multiple places
+        valid_edges = PowerAssetList(
+            [e[2]["object"] for e in self._power_graph.graph.edges(substation, data=True)],
+            cognite_client=self._cognite_client,
+        ).filter(grid_type=grid_type, base_voltage=base_voltage)
+        edges = [
+            edge for edge in self._power_graph.graph.edges(substation, data=True) if edge[2]["object"] in valid_edges
+        ]
+        neighbors = [n for e in edges for n in e[:2] if n != substation]
+        return neighbors
+
+    def expand_area(self, level=1, grid_type: str = None, base_voltage: Iterable = None) -> "PowerArea":
+        """Expand the area by following line segments `level` times."""
+        visited_nodes = set(self._graph.nodes)
+        level_nodes = visited_nodes
         for _ in range(level):
             level_nodes = {
                 nb
                 for n in level_nodes
-                for nb, data in networkx_graph[n].items()
-                if nb not in visited_nodes and (base_voltage is None or data["object"].base_voltage in base_voltage)
+                for nb in self._find_neighbors(n, grid_type, base_voltage)
+                if nb not in visited_nodes
             }
             visited_nodes |= level_nodes
-        return visited_nodes
-
-    def expand_area(self, level=1, base_voltage: Iterable = None) -> "PowerArea":
-        """Expand the area by following line segments `level` times."""
-        nodes = self._expand_area(self._power_graph.graph, self._graph.nodes, level, base_voltage)
-        return PowerArea(self._cognite_client, [node for node in nodes], self._power_graph)
+        return PowerArea(self._cognite_client, [node for node in visited_nodes], self._power_graph)
 
     def is_connected(self) -> bool:
         return nx.is_connected(self._graph)

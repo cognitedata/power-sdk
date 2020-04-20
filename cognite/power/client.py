@@ -70,12 +70,16 @@ class PowerClient(CogniteClient):
         substations: List[Union[Substation, str]] = None,
         ac_line_segments: List[Union[ACLineSegment, str, Tuple[str, str]]] = None,
         interior_substation: Substation = None,
+        grid_type: str = None,
+        base_voltage: Iterable = None,
     ):
         self.initialize_power_graph()
         if substations:
             return PowerArea(self, substations, self.power_graph)
         elif ac_line_segments and interior_substation:
-            return PowerArea.from_interface(self, self.power_graph, ac_line_segments, interior_substation)
+            return PowerArea.from_interface(
+                self, self.power_graph, ac_line_segments, interior_substation, grid_type, base_voltage
+            )
         else:
             raise ValueError(
                 "Need either a list of substations or a list of ac_line_segments plus an interior substation to define an area"
