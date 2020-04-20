@@ -2,11 +2,11 @@ from collections import defaultdict
 
 import networkx as nx
 
-from cognite.power.data_classes import PowerAsset, PowerAssetList
+from cognite.power.data_classes import PowerAsset
 
 
 class PowerGraph:
-    def __init__(self, cognite_client, graph=None):
+    def __init__(self, cognite_client):
         """Initializes a power graph. An instance of this is created when creating the first PowerArea, it should not be instantiated elsewhere."""
         self._cognite_client = cognite_client
         self._load()
