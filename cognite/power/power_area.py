@@ -3,10 +3,10 @@ from collections import defaultdict
 from typing import *
 
 import networkx as nx
-from matplotlib.colors import LinearSegmentedColormap
-
 import plotly.graph_objs as go
 import pyproj
+from matplotlib.colors import LinearSegmentedColormap
+
 from cognite.client.data_classes import Asset
 from cognite.power.data_classes import *
 
