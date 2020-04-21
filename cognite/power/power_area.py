@@ -1,6 +1,6 @@
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import *
 
 import networkx as nx
@@ -268,37 +268,60 @@ class PowerArea:
         c = ",".join(map(str, color))
         return f"rgb({c})"
 
-    def draw_flow(self, labels="fixed", position="project", height=None, date=None):
+    @staticmethod
+    def _np_datetime_to_ms(np_datetime):
+        return np_datetime.astype("datetime64[ms]").astype("uint64")
+
+    def draw_flow(
+        self,
+        labels="fixed",
+        position="project",
+        height=None,
+        timeseries_type="estimated_value",
+        granularity="1h",
+        date: "np.datetime64" = None,
+    ):
+        """
+        Draws power flow through the area.
+
+        Args:
+            labels,position,height: as in `draw`
+            timeseries_type: type of time series to retrieve, i.e. value/estimated_value.
+            granularity: time step at which to average values over, as in the Python SDK `retrieve_dataframe` function.
+            date: datetime object at which to visualize flow, use None for now.
+        """
         node_trace, edge_traces, edge_node_trace, node_positions = self._plotly_nodes_edges(labels, position)
         terminals = PowerAssetList(
             list(set(sum([list(data["terminals"].values()) for f, t, data in self._graph.edges(data=True)], []))),
             cognite_client=self._cognite_client,
         )
-        ts = terminals.time_series(measurement_type="ThreePhaseActivePower", timeseries_type="estimated_value")
+        ts = terminals.time_series(measurement_type="ThreePhaseActivePower", timeseries_type=timeseries_type)
         analogs = self._cognite_client.assets.retrieve_multiple(ids=[t.asset_id for t in ts])
         terminal_ids = [a.parent_id for a in analogs]
 
+        target_time = np.datetime64(date or datetime.now())
+        delta = np.timedelta64(5, "D")
+        start = self._np_datetime_to_ms((target_time - delta))
+        end = self._np_datetime_to_ms((target_time + delta))
         df = self._cognite_client.datapoints.retrieve_dataframe(
             id=[t.id for t in ts],
             aggregates=["average"],
-            granularity="1h",
-            start=datetime(2019, 1, 1),
-            end=datetime(2020, 1, 1),
+            granularity=granularity,
+            start=start,  # TODO: split data prep and update
+            end=end,
             include_aggregate_name=False,
         )
         df.columns = terminal_ids
 
-        target_time = date or datetime.now()
         ix = np.searchsorted(df.index, target_time, side="left")
         flow_values = df.iloc[ix - 1, :]
+        title = f"flow at {df.index[ix - 1]}"
 
         distances = [
             np.linalg.norm(np.array(node_positions[edge[0]]) - np.array(node_positions[edge[1]]))
             for edge in self._graph.edges
         ]
-        arrow_scale = min(
-            0.5 * np.min(distances), 0.15 * np.mean(distances)
-        )  # normal 0.1 * mean, but make sure it doesn't go over reasonable min
+        global_arrow_scale = 0.15 * np.mean(distances)  # TODO: what is reasonable here?
 
         arrow_traces = []
         for f, t, data in self._graph.edges(data=True):
@@ -319,7 +342,10 @@ class PowerArea:
             from_pos = np.array(node_positions[f])
             to_pos = np.array(node_positions[t])
             from_to_vec = to_pos - from_pos
-            from_to_vec /= np.linalg.norm(from_to_vec)
+            distance = np.linalg.norm(from_to_vec)
+            arrow_scale = min(global_arrow_scale, 0.3 * distance)
+
+            from_to_vec /= min(distance, 1e-5)
             if flow_values_t[0] < flow_values_t[1]:
                 flow_vec = -from_to_vec
             else:
@@ -333,18 +359,16 @@ class PowerArea:
             # direction of arrow depends on sign of flow
             arrow_from_tail = arrow_from_mid - 0.33 * arrow_scale * flow_vec * sign_from
             arrow_from_head = arrow_from_mid + 0.33 * arrow_scale * flow_vec * sign_from
-            arrow_from_left = arrow_from_tail - orthogonal * arrow_scale * 0.5
-            arrow_from_right = arrow_from_tail + orthogonal * arrow_scale * 0.5
+            arrow_from_left = arrow_from_tail - orthogonal * global_arrow_scale * 0.5
+            arrow_from_right = arrow_from_tail + orthogonal * global_arrow_scale * 0.5
 
             sign_to = math.copysign(1, flow_values_t[1]) if not np.isnan(flow_values_t[1]) else 0
             arrow_to_mid = mid + 0.5 * arrow_scale * from_to_vec  # arrow middle is always closer to to
             # direction of arrow depends on sign of flow
             arrow_to_tail = arrow_to_mid - 0.33 * arrow_scale * flow_vec * (-sign_to)
             arrow_to_head = arrow_to_mid + 0.33 * arrow_scale * flow_vec * (-sign_to)
-            arrow_to_left = arrow_to_tail - orthogonal * arrow_scale * 0.5
-            arrow_to_right = arrow_to_tail + orthogonal * arrow_scale * 0.5
-
-            # print(f, t, arrow_scale, sign_from, sign_to, flow_vec, from_to_vec)
+            arrow_to_left = arrow_to_tail - orthogonal * global_arrow_scale * 0.5
+            arrow_to_right = arrow_to_tail + orthogonal * global_arrow_scale * 0.5
 
             arrows = [
                 [arrow_from_left, arrow_from_head, arrow_from_right],
@@ -367,8 +391,9 @@ class PowerArea:
                 )
 
         fig = go.Figure(
-            data=edge_traces + [edge_node_trace, node_trace] + arrow_traces,
+            data=[node_trace] + edge_traces + arrow_traces,
             layout=go.Layout(
+                title=title,
                 height=height,
                 plot_bgcolor="rgb(250,250,250)",
                 titlefont_size=16,
