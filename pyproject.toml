@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cognite-power-sdk"
-version = "0.8.10"
+version = "0.8.11"
 description = "Cognite Power SDK"
 authors = ["Sander Land <sander.land@cognite.com>"]
 
@@ -45,6 +45,7 @@ networkx = "^2.4"
 matplotlib = "^3.2.1"
 plotly = "^4.5.4"
 pyproj = "^2.6.0"
+textdistance = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^19.3b0"

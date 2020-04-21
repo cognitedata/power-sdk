@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import networkx as nx
+import textdistance
 
 from cognite.power.data_classes import PowerAsset
 
@@ -10,6 +11,14 @@ class PowerGraph:
         """Initializes a power graph. An instance of this is created when creating the first PowerArea, it should not be instantiated elsewhere."""
         self._cognite_client = cognite_client
         self._load()
+
+    def helpful_substation_lookup(self, substation: str):
+        if substation in self.graph.nodes:
+            return substation, self.graph.nodes(data=True)[substation]
+        else:
+            close_matches = [name for name in list(self.graph.nodes) if textdistance.hamming(substation, name) <= 1]
+            helper_message = " Did you mean: {}?".format(close_matches) if len(close_matches) > 0 else ""
+            raise KeyError("Did not find substation '{}'.{}".format(substation, helper_message))
 
     def _load(self):
         substations = self._cognite_client.substations.list()

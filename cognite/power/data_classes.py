@@ -357,14 +357,19 @@ class PowerAssetList(AssetList):
             power_assets = [a for a in power_assets if a.grid_type == grid_type]
         return PowerAssetList(power_assets, cognite_client=self._cognite_client)
 
-    def to_power_area(self, interior_substation: Union[str, Substation] = None):
+    def to_power_area(
+        self, interior_substation: Union[str, Substation] = None, grid_type: str = None, base_voltage: Iterable = None,
+    ):
         try:
             if self.type == "Substation":
                 return self._cognite_client.power_area(self)
             elif self.type == "ACLineSegment":
                 if interior_substation:
                     return self._cognite_client.power_area(
-                        ac_line_segments=self, interior_substation=interior_substation
+                        ac_line_segments=self,
+                        interior_substation=interior_substation,
+                        grid_type=grid_type,
+                        base_voltage=base_voltage,
                     )
                 else:
                     raise ValueError("Need an substation on the interior of the area to create from ac line segments.")
