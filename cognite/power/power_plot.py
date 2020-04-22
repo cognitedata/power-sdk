@@ -261,6 +261,7 @@ class PowerPlot:
     @staticmethod
     def draw_flow(
         power_area,
+        labels="fixed",
         position="project",
         height=None,
         timeseries_type="estimated_value",
@@ -276,8 +277,12 @@ class PowerPlot:
             granularity: time step at which to average values over, as in the Python SDK `retrieve_dataframe` function.
             date: datetime object at which to visualize flow, use None for now.
         """
+        node_plot_mode = "markers"
+        if labels == "fixed":
+            node_plot_mode += "+text"
+
         node_positions = node_layout(power_area, position)
-        substation_plot = create_substation_plot(node_positions, "markers")
+        substation_plot = create_substation_plot(node_positions, node_plot_mode)
         lats, lons, center_lats, center_lons, text = edge_locations(power_area, node_positions)
         ac_line_segment_plots, ac_line_label_point_plot = create_line_segment_plot(
             lons, lats, center_lons, center_lats, text
