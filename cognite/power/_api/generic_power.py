@@ -102,6 +102,7 @@ class GenericPowerAPI(AssetsAPI):
 
     def search(
         self,
+        name: str = None,
         grid_type: str = None,
         base_voltage: Iterable = None,
         bidding_area: Union[str, List[str]] = None,
@@ -112,6 +113,7 @@ class GenericPowerAPI(AssetsAPI):
         """Search power assets. Supports all parameters as the normal search function in addition to some power specific ones.
 
         Args:
+            name (str): Fuzzy search on name.
             grid_type (str): filters on Equipment.gridType. Can give "GridTypeKind.regional" or just "regional" etc.
             base_voltage (Iterable): filters on BaseVoltage_nominalVoltage in the given range or list.
             bidding_area (Union[str, List[str]]): filters on assets being in the bidding areas with this name.
@@ -126,7 +128,12 @@ class GenericPowerAPI(AssetsAPI):
         if isinstance(asset_type, list):
             asset_lists = [
                 self.search(
-                    asset_type=type, bidding_area=bidding_area, base_voltage=base_voltage, grid_type=grid_type, **kwargs
+                    name=name,
+                    asset_type=type,
+                    bidding_area=bidding_area,
+                    base_voltage=base_voltage,
+                    grid_type=grid_type,
+                    **kwargs,
                 )
                 for type in asset_type
             ]
