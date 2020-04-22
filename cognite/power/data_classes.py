@@ -322,7 +322,6 @@ class PowerAssetList(AssetList):
     @property
     def type(self) -> Optional[str]:
         """Type of the list of assets, will raise a MixedPowerAssetListException if the list contains several asset types."""
-        self.to_pandas
         if not self.data:
             return None
 
@@ -361,7 +360,6 @@ class PowerAssetList(AssetList):
     def to_power_area(
         self, interior_substation: Union[str, Substation] = None, grid_type: str = None, base_voltage: Iterable = None,
     ):
-        self.to_pandas()
         try:
             if self.type == "Substation":
                 return self._cognite_client.power_area(self)
