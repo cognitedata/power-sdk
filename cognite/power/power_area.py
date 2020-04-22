@@ -152,7 +152,6 @@ class PowerArea:
 
     def draw_flow(
         self,
-        labels="fixed",
         position="project",
         height=None,
         timeseries_type="estimated_value",
@@ -168,11 +167,5 @@ class PowerArea:
             date: datetime object at which to visualize flow, use None for now.
         """
         return PowerPlot.draw_flow(
-            self,
-            labels=labels,
-            position=position,
-            height=height,
-            timeseries_type=timeseries_type,
-            granularity=granularity,
-            date=date,
+            self, position=position, height=height, timeseries_type=timeseries_type, granularity=granularity, date=date,
         )

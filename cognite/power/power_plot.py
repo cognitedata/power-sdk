@@ -261,7 +261,6 @@ class PowerPlot:
     @staticmethod
     def draw_flow(
         power_area,
-        labels="fixed",
         position="project",
         height=None,
         timeseries_type="estimated_value",
