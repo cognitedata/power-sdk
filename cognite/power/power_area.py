@@ -149,3 +149,23 @@ class PowerArea:
             height: figure height (width is set based on fixed aspect ratio)
         """
         return PowerPlot.draw(self, labels, position, height)
+
+    def draw_flow(
+        self,
+        position="project",
+        height=None,
+        timeseries_type="estimated_value",
+        granularity="1h",
+        date: "np.datetime64" = None,
+    ):
+        """Plots flow in area.
+
+        Args:
+            labels,position,height: as in `draw`
+            timeseries_type: type of time series to retrieve, i.e. value/estimated_value.
+            granularity: time step at which to average values over, as in the Python SDK `retrieve_dataframe` function.
+            date: datetime object at which to visualize flow, use None for now.
+        """
+        return PowerPlot.draw_flow(
+            self, position=position, height=height, timeseries_type=timeseries_type, granularity=granularity, date=date,
+        )
