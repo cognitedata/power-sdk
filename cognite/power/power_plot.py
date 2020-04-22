@@ -1,10 +1,10 @@
-import plotly.graph_objects as go
-from collections import defaultdict
 import math
-from numpy import mean, nanmean
-import networkx as nx
-import pyproj
+from collections import defaultdict
 
+import networkx as nx
+import plotly.graph_objects as go
+import pyproj
+from numpy import mean, nanmean
 
 # univeral transverse mercator zone 32 = south norway, germany
 _LATLON_PROJ = "+proj=utm +zone=32, +north +ellps=WGS84 +datum=WGS84 +units=m +no_defs"

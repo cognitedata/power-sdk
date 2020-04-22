@@ -1,6 +1,8 @@
 import networkx as nx
-from cognite.power.power_plot import PowerPlot
+
 from cognite.power.data_classes import *
+from cognite.power.power_plot import PowerPlot
+
 
 class PowerArea:
     """
@@ -147,4 +149,3 @@ class PowerArea:
             height: figure height (width is set based on fixed aspect ratio)
         """
         return PowerPlot.draw(self, labels, position, height)
-
