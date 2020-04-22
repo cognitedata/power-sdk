@@ -25,7 +25,7 @@ def _latlon_to_xy(lat, lon):
     return (x, y)
 
 
-def voltage_color(bv: float):
+def voltage_color(base_voltage: float):
     color_map = [
         (-1e9, "000000"),
         (100, "000000"),
@@ -36,9 +36,9 @@ def voltage_color(bv: float):
     ]
     color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
     ix_above = 0
-    while color_map[ix_above][0] < bv:
+    while color_map[ix_above][0] < base_voltage:
         ix_above += 1
-    t = (bv - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
+    t = (base_voltage - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
     color = [
         int(color_map[ix_above - 1][1][rgb] + t * (color_map[ix_above][1][rgb] - color_map[ix_above - 1][1][rgb]))
         for rgb in range(3)
@@ -48,26 +48,7 @@ def voltage_color(bv: float):
 
 
 def _flow_color(flow: float):
-    color_map = [
-        (-1e9, "000000"),
-        (100, "000000"),
-        (132, "9ACA3C"),
-        (300, "20B3DE"),
-        (420, "ED1C24"),
-        (1e9, "ED1C24"),
-    ]
-    color_map = [(v, tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))) for v, h in color_map]  # to rgb
-
-    ix_above = 0
-    while color_map[ix_above][0] < flow:
-        ix_above += 1
-    t = (flow - color_map[ix_above - 1][0]) / (color_map[ix_above][0] - color_map[ix_above - 1][0])
-    color = [
-        int(color_map[ix_above - 1][1][rgb] + t * (color_map[ix_above][1][rgb] - color_map[ix_above - 1][1][rgb]))
-        for rgb in range(3)
-    ]
-    c = ",".join(map(str, color))
-    return f"rgb({c})"
+    return voltage_color(base_voltage=flow)
 
 
 def node_locations(power_area, interpolate_missing_positions=True):
