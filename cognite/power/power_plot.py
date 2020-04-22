@@ -6,6 +6,10 @@ import plotly.graph_objects as go
 import pyproj
 from numpy import mean, nanmean
 
+# unified plotting colors
+_MARKER_EDGE_COLOR = "rgb(85,150,210)"
+_MARKER_FILL_COLOR = "rgb(230,230,230)"
+
 # univeral transverse mercator zone 32 = south norway, germany
 _LATLON_PROJ = "+proj=utm +zone=32, +north +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
 _PROJECTION = pyproj.Proj(_LATLON_PROJ, preserve_units=True)
@@ -72,21 +76,27 @@ def create_substation_plot(node_locations, node_plot_mode):
         mode=node_plot_mode,
         textposition="top center",
         hoverinfo="text",
-        marker=dict(size=15, line=dict(color="rgb(85,150,210)", width=2), color="rgb(230,230,230)"),
+        marker=dict(size=15, line=dict(color=_MARKER_EDGE_COLOR, width=2), color=_MARKER_FILL_COLOR),
     )
 
 
 def create_substation_map_plot(node_locations):
     text, lon, lat = zip(*[(k, v[0], v[1]) for k, v in node_locations.items()])
-    return go.Scattermapbox(
-        lat=lat,
-        lon=lon,
-        text=text,
-        mode="markers",
-        showlegend=False,
-        hoverinfo="text",
-        marker=dict(size=15, color="fuchsia"),
-    )
+    # to get an edge color we plot the same data twice with difference marker size
+    plots = [
+        go.Scattermapbox(lat=lat, lon=lon, showlegend=False, marker=dict(size=17, color=_MARKER_EDGE_COLOR),),
+        go.Scattermapbox(
+            lat=lat,
+            lon=lon,
+            text=text,
+            mode="markers",
+            showlegend=False,
+            hoverinfo="text",
+            marker=dict(size=13, color=_MARKER_FILL_COLOR),
+            textposition="top center",
+        ),
+    ]
+    return plots
 
 
 def edge_locations(power_area, node_locations):
@@ -165,10 +175,10 @@ def create_line_segment_map_plot(lats, lons, center_lats, center_lons, text):
 
 class PowerPlot:
     @staticmethod
-    def draw_with_map(power_area, height=300):
+    def draw_with_map(power_area, height=None):
         # plot substations
         node_locs = node_locations(power_area, interpolate_missing_positions=False)
-        substation_plot = create_substation_map_plot(node_locs)
+        substation_plots = create_substation_map_plot(node_locs)
 
         # plot ac line segments
         lats, lons, center_lats, center_lons, text = edge_locations(power_area, node_locs)
@@ -177,7 +187,7 @@ class PowerPlot:
         center = nanmean([v for v in node_locs.values()], axis=0)
         fig = go.Figure(
             # ordering matters here: substations last so they are drawn on top
-            data=ac_line_segment_plots + [substation_plot],
+            data=ac_line_segment_plots + substation_plots,
             layout=go.Layout(
                 hovermode="closest",
                 mapbox_style="stamen-terrain",
@@ -186,7 +196,8 @@ class PowerPlot:
                 mapbox=dict(zoom=7, center=dict(lon=center[0], lat=center[1])),
             ),
         )
-        fig.show()
+
+        return fig
 
     @staticmethod
     def draw(power_area, labels="fixed", position="project", height=None):
