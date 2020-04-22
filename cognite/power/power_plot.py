@@ -9,9 +9,9 @@ import plotly.graph_objects as go
 import pyproj
 from numpy import mean, nanmean
 
-# unified plotting colors
 from cognite.power.data_classes import PowerAssetList
 
+# unified plotting colors
 _MARKER_EDGE_COLOR = "rgb(85,150,210)"
 _MARKER_FILL_COLOR = "rgb(230,230,230)"
 
