@@ -5,7 +5,7 @@
 
 Cognite Power SDK
 =================
-[![build](https://webhooks.dev.cognite.ai/build/buildStatus/icon?job=github-builds/power-sdk/master)](https://jenkins.cognite.ai/job/github-builds/job/power-sdk/job/master/)
+[![Build Status](https://github.com/cognitedata/power-sdk/workflows/release/badge.svg)](https://github.com/cognitedata/power-sdk/actions)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
 This is an extensions package to the [Cognite Python SDK](https://github.com/cognitedata/cognite-sdk-python)
