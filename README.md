@@ -20,11 +20,12 @@ Import a client with:
 ```python
 from cognite.power import PowerClient
 ```
-The resulting client object will contain all normal SDK functionality
+The resulting client object will contain all normal and experimental SDK functionality
 in addition to Power SDK extensions.
 
 ## Documentation
-* Power SDK Documentation is available by running `make html` in the `docs` directory.
+* [Power SDK Documentation](https://cognite-power-sdk.readthedocs-hosted.com/en/latest/)
+* [Experimental SDK Documentation](https://cognite-sdk-experimental.readthedocs-hosted.com/en/latest/)
 * [SDK Documentation](https://cognite-docs.readthedocs-hosted.com/en/latest/)
 * [API Documentation](https://doc.cognitedata.com/)
 * [Cognite Developer Documentation](https://docs.cognite.com/dev/)
