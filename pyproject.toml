@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "cognite-power-sdk"
+version = "0.8.14"
+description = "Cognite Power SDK"
+authors = ["Sander Land <sander.land@cognite.com>"]
+
+packages = [
+    { include="cognite", from="." },
+]
+
+[tool.black]
+line-length = 120
+target_version = ['py37']
+include = '\.py$'
+
+[tool.isort]
+line_length=120                # corresponds to -w  flag
+multi_line_output=3            # corresponds to -m  flag
+include_trailing_comma=true    # corresponds to -tc flag
+skip_glob = '^((?!py$).)*$'    # this makes sort all Python files
+known_third_party = ["networkx", "numpy", "pandas", "plotly", "pyproj", "pytest", "textdistance"]
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+isolated_build = true
+envlist = py36,py37,py38
+
+[testenv]
+deps =
+    pytest
+    pytest-cov
+    cognite-sdk-experimental
+    pandas
+
+commands =
+    pytest tests --cov-report xml:coverage.xml --cov=cognite
+"""
+
+[tool.poetry.dependencies]
+python = "^3.6.1"
+cognite-sdk-experimental = "^0.5"
+numpy = "^1.18.1"
+networkx = "^2.4"
+matplotlib = "^3.2.1"
+plotly = "^4.5.4"
+pyproj = "^2.6.0"
+textdistance = "^4.2.0"
+
+[tool.poetry.dev-dependencies]
+black = "^19.3b0"
+isort = "^4.3"
+pre-commit = "^2.0"
+pytest = "^5.3"
+pytest-cov = "^2.8"
+tox = "^3.14"
+tox-pyenv = "^1.1"
+sphinx = "^2.4.4"
+sphinx-rtd-theme = "^0.4.3"
+twine = "^3.1.1"
+
+[[tool.poetry.source]]
+name = "snakepit"
+url = "https://cognite.jfrog.io/cognite/api/pypi/snakepit/simple"
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
