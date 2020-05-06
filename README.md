@@ -6,7 +6,10 @@
 Cognite Power SDK
 =================
 [![Release Status](https://github.com/cognitedata/power-sdk/workflows/release/badge.svg)](https://github.com/cognitedata/power-sdk/actions)
+[![Documentation Status](https://readthedocs.com/projects/cognite-power-sdk/badge/?version=latest)](https://cognite-power-sdk.readthedocs-hosted.com/en/latest/)
+[![PyPI version](https://badge.fury.io/py/cognite-power-sdk.svg)](https://pypi.org/project/cognite-sdk-experimental/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+
 
 This is an extensions package to the [Cognite Python SDK](https://github.com/cognitedata/cognite-sdk-python)
  for power grid specific applications in Cognite Data Fusion (CDF). 
