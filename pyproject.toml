@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cognite-power-sdk"
-version = "0.8.14"
+version = "0.8.15"
 description = "Cognite Power SDK"
 authors = ["Sander Land <sander.land@cognite.com>"]
 
