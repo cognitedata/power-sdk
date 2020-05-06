@@ -154,7 +154,7 @@ class GenericPowerAPI(AssetsAPI):
         if "filter" in kwargs:
             del kwargs["filter"]
 
-        assets = super().search(limit=limit, filter=filter, **kwargs)
+        assets = super().search(name=name, limit=limit, filter=filter, **kwargs)
         return PowerAssetList._load_assets(
             assets,
             filter.get("metadata", {}).get("type"),
