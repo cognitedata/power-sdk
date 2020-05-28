@@ -1,5 +1,5 @@
 import math
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime
 
 import networkx as nx
@@ -132,13 +132,27 @@ def edge_locations(power_area, node_locations):
     center_lons = defaultdict(list)
     center_lats = defaultdict(list)
     text = defaultdict(list)
+
+    counter = Counter([(edge[0], edge[1]) for edge in list(power_area._graph.edges(data=True))])
+    dups = {key: 1 for key in counter if counter[key] + counter[key[::-1]] == 2}  # TODO: handle 3?
     for acls in networkx_edges:
         lon, lat = zip(*[node_locations[s] for s in acls[:2]])
+        center_lat = mean(lat)
+        center_lon = mean(lon)
+        if (acls[0], acls[1]) in dups:
+            # probably there are more elegant ways, but we want to offset the center in cases where there are multiple
+            # lines between two substations
+            lat_len = abs(lat[1] - lat[0])
+            lon_len = abs(lon[1] - lon[0])
+            edge_length = math.sqrt((lat_len) ** 2 + (lon_len) ** 2)
+            center_lat += 0.005 * dups[(acls[0], acls[1])] * lon_len / edge_length
+            center_lon += 0.005 * dups[(acls[0], acls[1])] * lat_len / edge_length
+            dups[(acls[0], acls[1])] *= -1
         base_voltage = acls[2]["object"].metadata.get("BaseVoltage_nominalVoltage", "0")
-        lats[base_voltage] += list(lat) + [math.nan]
-        lons[base_voltage] += list(lon) + [math.nan]
-        center_lons[base_voltage].append(mean(lon))
-        center_lats[base_voltage].append(mean(lat))
+        lats[base_voltage] += [lat[0], center_lat, lat[1], math.nan]
+        lons[base_voltage] += [lon[0], center_lon, lon[1], math.nan]
+        center_lons[base_voltage].append(center_lon)
+        center_lats[base_voltage].append(center_lat)
         text[base_voltage].append("{}: {} kV".format(acls[2]["object"].name, base_voltage))
 
     return lats, lons, center_lats, center_lons, text
@@ -149,7 +163,7 @@ def create_line_segment_plot(x, y, center_x, center_y, text):
         go.Scatter(
             x=x[base_voltage],
             y=y[base_voltage],
-            line=dict(width=2, color=voltage_color(float(base_voltage))),
+            line=dict(width=2, color=voltage_color(float(base_voltage)), shape="spline", smoothing=1.3),
             hoverinfo="none",
             mode="lines",
         )

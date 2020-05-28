@@ -44,7 +44,8 @@ class PowerArea:
         full_networkx_graph = power_graph.graph
         temp_graph = full_networkx_graph.copy()
         for edge in interface_edges:
-            temp_graph.remove_edge(edge[0], edge[1])
+            while temp_graph.has_edge(*edge):
+                temp_graph.remove_edge(*edge)
         power_graph.graph = temp_graph
         # some extra safety to ensure we always re-instate the original graph:
         try:

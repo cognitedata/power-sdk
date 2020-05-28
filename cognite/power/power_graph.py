@@ -61,24 +61,25 @@ class PowerGraph:
                     [(line_segment, terminal) for line_segment in ac_line_segments]
                 )
                 for a in ac_line_segments:
-                    ac_line_segment_con_substations[a].append((substation, terminal))
+                    ac_line_segment_con_substations[a].append({"substation": substation, "terminal": terminal})
 
         self.graph = nx.MultiGraph()
 
         edges = (
             (
-                substation_from_extid[subs_and_terms[0][0]].name,
-                substation_from_extid[subs_and_terms[1][0]].name,
+                substation_from_extid[data[0]["substation"]].name,
+                substation_from_extid[data[1]["substation"]].name,
                 {
                     "object": ac_line_segment_from_extid[acls],
                     "terminals": {
-                        substation_from_extid[subs_and_terms[0][0]].name: terminal_from_extid[subs_and_terms[0][1]],
-                        substation_from_extid[subs_and_terms[1][0]].name: terminal_from_extid[subs_and_terms[1][1]],
+                        substation_from_extid[data[0]["substation"]].name: terminal_from_extid[data[0]["terminal"]],
+                        substation_from_extid[data[1]["substation"]].name: terminal_from_extid[data[1]["terminal"]],
                     },
                 },
             )
-            for acls, subs_and_terms in ac_line_segment_con_substations.items()
-            if len(subs_and_terms) == 2 and subs_and_terms[0][0] != subs_and_terms[1][0]
+            for acls, data in ac_line_segment_con_substations.items()
+            if len(data) == 2  # Skipping dangling line segments
+            and data[0]["substation"] != data[1]["substation"]  # Skipping self-loops
         )
         self.graph.add_edges_from(edges)
         self.graph.add_nodes_from((substation.name, {"object": substation}) for substation in substations)
