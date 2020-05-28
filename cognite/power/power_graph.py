@@ -65,12 +65,20 @@ class PowerGraph:
 
         self.graph = nx.MultiGraph()
 
-        edges = ((substation_from_extid[subs_and_terms[0][0]].name, substation_from_extid[subs_and_terms[1][0]].name, {
-            "object": ac_line_segment_from_extid[acls],
-            "terminals": {
-                substation_from_extid[subs_and_terms[0][0]].name: terminal_from_extid[subs_and_terms[0][1]],
-                substation_from_extid[subs_and_terms[1][0]].name: terminal_from_extid[subs_and_terms[1][1]],
-            },
-        }) for acls, subs_and_terms in ac_line_segment_con_substations.items() if len(subs_and_terms) == 2 and subs_and_terms[0][0] != subs_and_terms[1][0])
+        edges = (
+            (
+                substation_from_extid[subs_and_terms[0][0]].name,
+                substation_from_extid[subs_and_terms[1][0]].name,
+                {
+                    "object": ac_line_segment_from_extid[acls],
+                    "terminals": {
+                        substation_from_extid[subs_and_terms[0][0]].name: terminal_from_extid[subs_and_terms[0][1]],
+                        substation_from_extid[subs_and_terms[1][0]].name: terminal_from_extid[subs_and_terms[1][1]],
+                    },
+                },
+            )
+            for acls, subs_and_terms in ac_line_segment_con_substations.items()
+            if len(subs_and_terms) == 2 and subs_and_terms[0][0] != subs_and_terms[1][0]
+        )
         self.graph.add_edges_from(edges)
         self.graph.add_nodes_from((substation.name, {"object": substation}) for substation in substations)

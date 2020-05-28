@@ -18,7 +18,11 @@ class PowerArea:
         self._graph = nx.MultiGraph()
         self._graph.add_nodes_from(power_graph.helpful_substation_lookup(k) for k in substations)
         self._graph.add_edges_from(
-            (edge for edge in power_graph.graph.edges(data=True) if self._graph.has_node(edge[0]) and self._graph.has_node(edge[1]))
+            (
+                edge
+                for edge in power_graph.graph.edges(data=True)
+                if self._graph.has_node(edge[0]) and self._graph.has_node(edge[1])
+            )
         )
 
     @classmethod
