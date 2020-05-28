@@ -63,22 +63,14 @@ class PowerGraph:
                 for a in ac_line_segments:
                     ac_line_segment_con_substations[a].append((substation, terminal))
 
-        self.graph = nx.Graph()
-        self.graph.add_edges_from(
-            (
-                substation_from_extid[substation_from].name,
-                substation_from_extid[substation_to].name,
-                {
-                    "object": ac_line_segment_from_extid[line],
-                    "terminals": {  # Note that only one of the edges (a,b) and (b,a) is actually added, so this can not be by order
-                        substation_from_extid[substation_from].name: terminal_from_extid[terminal_from],
-                        substation_from_extid[substation_to].name: terminal_from_extid[terminal_to],
-                    },
-                },
-            )
-            for substation_from, acls in substation_con_ac_line_segments.items()
-            for line, terminal_from in acls
-            for substation_to, terminal_to in ac_line_segment_con_substations[line]
-            if substation_from != substation_to
-        )
+        self.graph = nx.MultiGraph()
+
+        edges = ((substation_from_extid[subs_and_terms[0][0]].name, substation_from_extid[subs_and_terms[1][0]].name, {
+            "object": ac_line_segment_from_extid[acls],
+            "terminals": {
+                substation_from_extid[subs_and_terms[0][0]].name: terminal_from_extid[subs_and_terms[0][1]],
+                substation_from_extid[subs_and_terms[1][0]].name: terminal_from_extid[subs_and_terms[1][1]],
+            },
+        }) for acls, subs_and_terms in ac_line_segment_con_substations.items() if len(subs_and_terms) == 2 and subs_and_terms[0][0] != subs_and_terms[1][0])
+        self.graph.add_edges_from(edges)
         self.graph.add_nodes_from((substation.name, {"object": substation}) for substation in substations)
