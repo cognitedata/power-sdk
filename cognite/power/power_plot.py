@@ -1,5 +1,5 @@
 import math
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 
 import networkx as nx
