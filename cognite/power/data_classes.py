@@ -140,6 +140,10 @@ class Analog(PowerAsset):
     pass
 
 
+class BusbarSection(PowerAsset):
+    pass
+
+
 class PowerTransformer(PowerAsset):
     def power_transformer_ends(
         self, end_number: Optional[Union[int, Iterable]] = None, base_voltage: Iterable = None
@@ -178,6 +182,12 @@ class Substation(PowerAsset):
     def ac_line_segments(self, base_voltage: Iterable = None, grid_type: Optional[str] = None) -> "PowerAssetList":
         """Shortcut for finding the connected ACLineSegments for a substation"""
         return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
+
+    def busbar_sections(self):
+        return self.relationship_sources("BusbarSection")
+
+    def conform_loads(self):
+        return self.relationship_sources("ConformLoad")
 
     def generating_units(self, power_type: Optional[Union[str, List[str]]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated GeneratingUnit for a Substation
@@ -545,6 +555,14 @@ class PowerAssetList(AssetList):
         """Shortcut for finding the associated ThermalGeneratingUnits for a list of Substations"""
         return self.generating_units("ThermalGeneratingUnit")
 
+    def busbar_sections(self, base_voltage: Iterable = None):
+        if self.has_type("Substation"):
+            return self.relationship_sources("BusbarSection", base_voltage=base_voltage)
+        elif not self.data:
+            return PowerAssetList([], cognite_client=self._cognite_client)
+        else:
+            raise WrongPowerTypeError(f"Can't get ConformLoads for a list of {self.type}")
+
     def conform_loads(self, base_voltage: Iterable = None) -> "PowerAssetList":
         if self.has_type("Substation"):
             return self.relationship_sources("ConformLoad", base_voltage=base_voltage)
@@ -555,7 +573,14 @@ class PowerAssetList(AssetList):
 
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the associated Substations for a list of PowerTransformer, ACLineSegment or Terminal"""
-        if self.has_type("PowerTransformer") or self.has_type("Terminal"):
+        if (
+            self.has_type("PowerTransformer")
+            or self.has_type("Terminal")
+            or self.has_type("ConformLoad")
+            or self.has_type("WindGeneratingUnit")
+            or self.has_type("ThermalGeneratingUnit")
+            or self.has_type("HydroGeneratingUnit")
+        ):
             return self.relationship_targets("Substation")
         elif self.has_type("ACLineSegment"):
             return self.terminals().substations()

@@ -43,6 +43,8 @@ class PowerClient(CogniteClient):
         self.substations = GenericPowerAPI("Substation", self.config, self._API_VERSION, self)
         self.synchronous_machines = GenericPowerAPI("SynchronousMachine", self.config, self._API_VERSION, self)
 
+        self.busbar_sections = GenericPowerAPI("BusbarSection", self.config, self._API_VERSION, self)
+
         self.hydro_generating_units = GenericPowerAPI("HydroGeneratingUnit", self.config, self._API_VERSION, self)
         self.wind_generating_units = GenericPowerAPI("WindGeneratingUnit", self.config, self._API_VERSION, self)
         self.thermal_generating_units = GenericPowerAPI("ThermalGeneratingUnit", self.config, self._API_VERSION, self)
