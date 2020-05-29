@@ -15,14 +15,14 @@ class PowerArea:
         if len(substations) < 1:
             raise ValueError("A power area must have at least one substation")
         self._power_graph = power_graph
-        self._graph = nx.Graph()
+        self._graph = nx.MultiGraph()
         self._graph.add_nodes_from(power_graph.helpful_substation_lookup(k) for k in substations)
         self._graph.add_edges_from(
-            (n, nbr, d)
-            for n, nbrs in self._power_graph.graph.adj.items()
-            if n in substations
-            for nbr, d in nbrs.items()
-            if nbr in substations
+            (
+                edge
+                for edge in power_graph.graph.edges(data=True)
+                if self._graph.has_node(edge[0]) and self._graph.has_node(edge[1])
+            )
         )
 
     @classmethod
@@ -44,7 +44,8 @@ class PowerArea:
         full_networkx_graph = power_graph.graph
         temp_graph = full_networkx_graph.copy()
         for edge in interface_edges:
-            temp_graph.remove_edge(edge[0], edge[1])
+            while temp_graph.has_edge(*edge):
+                temp_graph.remove_edge(*edge)
         power_graph.graph = temp_graph
         # some extra safety to ensure we always re-instate the original graph:
         try:

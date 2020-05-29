@@ -61,24 +61,25 @@ class PowerGraph:
                     [(line_segment, terminal) for line_segment in ac_line_segments]
                 )
                 for a in ac_line_segments:
-                    ac_line_segment_con_substations[a].append((substation, terminal))
+                    ac_line_segment_con_substations[a].append({"substation": substation, "terminal": terminal})
 
-        self.graph = nx.Graph()
-        self.graph.add_edges_from(
+        self.graph = nx.MultiGraph()
+
+        edges = (
             (
-                substation_from_extid[substation_from].name,
-                substation_from_extid[substation_to].name,
+                substation_from_extid[data[0]["substation"]].name,
+                substation_from_extid[data[1]["substation"]].name,
                 {
-                    "object": ac_line_segment_from_extid[line],
-                    "terminals": {  # Note that only one of the edges (a,b) and (b,a) is actually added, so this can not be by order
-                        substation_from_extid[substation_from].name: terminal_from_extid[terminal_from],
-                        substation_from_extid[substation_to].name: terminal_from_extid[terminal_to],
+                    "object": ac_line_segment_from_extid[acls],
+                    "terminals": {
+                        substation_from_extid[data[0]["substation"]].name: terminal_from_extid[data[0]["terminal"]],
+                        substation_from_extid[data[1]["substation"]].name: terminal_from_extid[data[1]["terminal"]],
                     },
                 },
             )
-            for substation_from, acls in substation_con_ac_line_segments.items()
-            for line, terminal_from in acls
-            for substation_to, terminal_to in ac_line_segment_con_substations[line]
-            if substation_from != substation_to
+            for acls, data in ac_line_segment_con_substations.items()
+            if len(data) == 2  # Skipping dangling line segments
+            and data[0]["substation"] != data[1]["substation"]  # Skipping self-loops
         )
+        self.graph.add_edges_from(edges)
         self.graph.add_nodes_from((substation.name, {"object": substation}) for substation in substations)
