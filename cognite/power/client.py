@@ -49,6 +49,7 @@ class PowerClient(CogniteClient):
         self.wind_generating_units = GenericPowerAPI("WindGeneratingUnit", self.config, self._API_VERSION, self)
         self.thermal_generating_units = GenericPowerAPI("ThermalGeneratingUnit", self.config, self._API_VERSION, self)
         self.conform_loads = GenericPowerAPI("ConformLoad", self.config, self._API_VERSION, self)
+        self.nonconform_loads = GenericPowerAPI("NonConformLoad", self.config, self._API_VERSION, self)
 
         self.power_transformers = GenericPowerAPI("PowerTransformer", self.config, self._API_VERSION, self)
         self.power_transformer_ends = PowerTransformerEndsAPI(self.config, self._API_VERSION, self)
