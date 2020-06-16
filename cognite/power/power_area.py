@@ -138,7 +138,7 @@ class PowerArea:
         """
         return PowerPlot.draw_with_map(self)
 
-    def draw(self, labels="fixed", position="project", height=None):
+    def draw(self, labels="fixed", position="kamada", height=None):
         """Plots substations and ac line segments.
 
         Args:
@@ -154,7 +154,7 @@ class PowerArea:
     def draw_flow(
         self,
         labels="fixed",
-        position="project",
+        position="kamada",
         height=None,
         timeseries_type="estimated_value",
         granularity="1h",
