@@ -587,7 +587,7 @@ class PowerAssetList(AssetList):
             raise WrongPowerTypeError(f"Can't get NonConformLoad for a list of {self.type}")
 
     def substations(self) -> "PowerAssetList":
-        """Shortcut for finding the associated Substations for a list of PowerTransformer, ACLineSegment or Terminal"""
+        """Shortcut for finding the associated Substations for a list of PowerTransformer, GeneratingUnit, (Non)ConformLoad, ACLineSegment or Terminal"""
         if (
             self.has_type("PowerTransformer")
             or self.has_type("Terminal")
