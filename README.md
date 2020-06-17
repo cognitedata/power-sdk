@@ -7,7 +7,7 @@ Cognite Power SDK
 =================
 [![Release Status](https://github.com/cognitedata/power-sdk/workflows/release/badge.svg)](https://github.com/cognitedata/power-sdk/actions)
 [![Documentation Status](https://readthedocs.com/projects/cognite-power-sdk/badge/?version=latest)](https://cognite-power-sdk.readthedocs-hosted.com/en/latest/)
-[![PyPI version](https://badge.fury.io/py/cognite-power-sdk.svg)](https://pypi.org/project/cognite-sdk-experimental/)
+[![PyPI version](https://badge.fury.io/py/cognite-power-sdk.svg)](https://pypi.org/project/cognite-power-sdk/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
 
