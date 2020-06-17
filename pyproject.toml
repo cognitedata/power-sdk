@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cognite-power-sdk"
-version = "0.9.0"
+version = "0.9.1"
 description = "Cognite Power SDK"
 authors = ["Sander Land <sander.land@cognite.com>"]
 
@@ -39,7 +39,7 @@ commands =
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
-cognite-sdk-experimental = "^0.5"
+cognite-sdk-experimental = "^0."
 numpy = "^1.18.1"
 networkx = "^2.4"
 matplotlib = "^3.2.1"

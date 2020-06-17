@@ -241,7 +241,7 @@ class PowerPlot:
         return fig
 
     @staticmethod
-    def draw(power_area, labels="fixed", position="project", height=None):
+    def draw(power_area, labels="fixed", position="kamada", height=None):
         node_positions = node_layout(power_area, position)
 
         node_plot_mode = "markers"
@@ -276,7 +276,7 @@ class PowerPlot:
     def draw_flow(
         power_area,
         labels="fixed",
-        position="project",
+        position="kamada",
         height=None,
         timeseries_type="estimated_value",
         granularity="1h",
@@ -308,7 +308,7 @@ class PowerPlot:
         )
         ts = terminals.time_series(measurement_type="ThreePhaseActivePower", timeseries_type=timeseries_type)
         analogs = power_area._cognite_client.assets.retrieve_multiple(ids=[t.asset_id for t in ts])
-        terminal_ids = [a.parent_id for a in analogs]
+        terminal_ids: List[int] = [a.parent_id for a in analogs]
 
         target_time = np.datetime64(date or datetime.now())
         delta = np.timedelta64(5, "D")
