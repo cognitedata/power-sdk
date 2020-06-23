@@ -75,6 +75,8 @@ class GenericPowerAPI(AssetsAPI):
         Returns:
             PowerAssetList: List of the requested assets.
         """
+        if (base_voltage is not None or isinstance(asset_type, list)) and limit not in [None, -1, float("inf")]:
+            raise ValueError("Can not set a limit when specifying a base voltage filter or multiple asset types")
         if self.power_type and asset_type:
             raise ValueError("Can not filter on asset_types in this API, use client.power_assets instead")
         if isinstance(asset_type, list):
@@ -91,7 +93,6 @@ class GenericPowerAPI(AssetsAPI):
                 cognite_client=self._cognite_client,
             )
         filters = self._create_filter(bidding_area=bidding_area, grid_type=grid_type, asset_type=asset_type, **kwargs)
-
         assets = super().list(limit=limit, **filters)
         return PowerAssetList._load_assets(
             assets,
