@@ -73,7 +73,9 @@ class PowerClient(CogniteClient):
 
         self.current_limits = GenericPowerAPI("CurrentLimit", self.config, self._API_VERSION, self)
         self.temperature_curves = GenericPowerAPI("TemperatureCurve", self.config, self._API_VERSION, self)
-        self.temperature_curve_dependent_limits = GenericPowerAPI("TemperatureCurveDependentLimit", self.config, self._API_VERSION, self)
+        self.temperature_curve_dependent_limits = GenericPowerAPI(
+            "TemperatureCurveDependentLimit", self.config, self._API_VERSION, self
+        )
         self.temperature_curve_data = GenericPowerAPI("TemperatureCurveData", self.config, self._API_VERSION, self)
         self.operational_limit_sets = GenericPowerAPI("OperationalLimitSet", self.config, self._API_VERSION, self)
         self.operational_limit_types = GenericPowerAPI("OperationalLimitType", self.config, self._API_VERSION, self)
