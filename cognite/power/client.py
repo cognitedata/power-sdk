@@ -21,11 +21,21 @@ class PowerClient(CogniteClient):
         * ``.thermal_generating_units``
         * ``.power_transformers``
         * ``.power_transformer_ends``
+        * ``.busbar_sections``
         * ``.conform_loads``
+        * ``.nonconform_loads``
+        * ``.shunt_compensators``
+        * ``.static_var_compensators``
+        * ``.peterson_coils``
         * ``.terminals``
         * ``.analogs``
+        * ``.current_limits``
+        * ``.temperature_curves``
+        * ``.temperature_curve_dependent_limits``
+        * ``.temperature_curve_data``
+        * ``.operational_limit_sets``
+        * ``.operational_limit_types``
         * ``.power_assets``: does not filter by type.
-
     Each of which is a GenericPowerAPI which returns assets of the relevant type(s).
     """
 
@@ -54,15 +64,22 @@ class PowerClient(CogniteClient):
         self.power_transformers = GenericPowerAPI("PowerTransformer", self.config, self._API_VERSION, self)
         self.power_transformer_ends = PowerTransformerEndsAPI(self.config, self._API_VERSION, self)
 
+        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
+        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
+        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
+
         self.terminals = GenericPowerAPI("Terminal", self.config, self._API_VERSION, self)
         self.analogs = GenericPowerAPI("Analog", self.config, self._API_VERSION, self)
 
+        self.current_limits = GenericPowerAPI("CurrentLimit", self.config, self._API_VERSION, self)
+        self.temperature_curves = GenericPowerAPI("TemperatureCurve", self.config, self._API_VERSION, self)
+        self.temperature_curve_dependent_limits = GenericPowerAPI("TemperatureCurveDependentLimit", self.config, self._API_VERSION, self)
+        self.temperature_curve_data = GenericPowerAPI("TemperatureCurveData", self.config, self._API_VERSION, self)
+        self.operational_limit_sets = GenericPowerAPI("OperationalLimitSet", self.config, self._API_VERSION, self)
+        self.operational_limit_types = GenericPowerAPI("OperationalLimitType", self.config, self._API_VERSION, self)
+
         self.power_assets = GenericPowerAPI(None, self.config, self._API_VERSION, self)
         self.power_graph = None
-
-    #        self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
-    #        self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
-    #        self.peterson_coils = GenericPowerAPI("PetersenCoil", self.config, self._API_VERSION, self)
 
     def initialize_power_graph(self):
         if not self.power_graph:

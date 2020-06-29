@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import *
 
 import numpy as np
+import pandas as pd
 
 from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList
 from cognite.client.utils._concurrency import execute_tasks_concurrently
@@ -35,6 +36,13 @@ class PowerAsset(Asset):
         """Safe way of getting a metadata value, returns None if metadata or key does not exist"""
         return (self.metadata or {}).get(key)
 
+    def float_metadata_value(self, key) -> Optional[float]:
+        val = self.metadata_value(key)
+        if val is not None:
+            return float(val)
+        else:
+            return None
+
     @property
     def type(self):
         """Shortcut for it's metadata-defined type (e.g. 'TransformerEnd')"""
@@ -43,11 +51,7 @@ class PowerAsset(Asset):
     @property
     def base_voltage(self) -> Optional[float]:
         """Gets the asset's base voltage as a float, or None if it has no base voltage"""
-        bv = self.metadata_value("BaseVoltage_nominalVoltage")
-        if bv is not None:
-            return float(bv)
-        else:
-            return None
+        return self.float_metadata_value("BaseVoltage_nominalVoltage")
 
     @property
     def grid_type(self) -> Optional[str]:
@@ -141,6 +145,54 @@ class Analog(PowerAsset):
 
 
 class BusbarSection(PowerAsset):
+    pass
+
+
+class CurrentLimit(PowerAsset):
+    @property
+    def value(self) -> Optional[float]:
+        return self.float_metadata_value("CurrentLimit.value")
+
+    @property
+    def limit_type(self) -> str:
+        return self.name.split("@")[0]
+
+
+class TemperatureCurve(PowerAsset):
+    pass
+
+
+class TemperatureCurveDependentLimit(PowerAsset):
+    pass
+
+
+class TemperatureCurveData(PowerAsset):
+    @property
+    def percent(self) -> Optional[float]:
+        return self.float_metadata_value("TemperatureCurveData.percent")
+
+    @property
+    def temperature(self) -> Optional[float]:
+        return self.float_metadata_value("TemperatureCurveData.temperature")
+
+
+class OperationalLimitSet(PowerAsset):
+    pass
+
+
+class OperationalLimitType(PowerAsset):
+    pass
+
+
+class ShuntCompensator(PowerAsset):
+    pass
+
+
+class StaticVarCompensator(PowerAsset):
+    pass
+
+
+class PetersenCoil(PowerAsset):
     pass
 
 
@@ -330,6 +382,35 @@ class ACLineSegment(PowerAsset):
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the connected substations"""
         return self.terminals().substations()
+
+    def operational_limit_sets(self) -> "PowerAssetList":
+        return self.relationship_sources("OperationalLimitSet")
+
+    def current_limits(self) -> "PowerAssetList":
+        return self.operational_limit_sets().relationship_sources("CurrentLimit")
+
+    def temperature_curve_dependent_limits(self) -> "PowerAssetList":
+        return self.relationship_sources("TemperatureCurveDependentLimit")
+
+    def temperature_curves(self) -> "PowerAssetList":
+        return self.temperature_curve_dependent_limits().relationship_sources("TemperatureCurve")
+
+    def temperature_curve_data(self) -> "PowerAssetList":
+        return self.temperature_curves().relationship_sources("TemperatureCurveData")
+
+    def current_limits_dataframe(self) -> "pd.DataFrame":
+        current_limits = self.current_limits()
+        temp_coefficients = self.temperature_curve_data()
+        return pd.DataFrame(
+            {
+                "type": current_limit.limit_type,
+                "temperature": coeff.temperature,
+                "limit": current_limit.value * coeff.percent,
+                "name": self.name,
+            }
+            for current_limit in current_limits
+            for coeff in temp_coefficients
+        ).set_index(["name", "type", "temperature"])
 
 
 class PowerAssetList(AssetList):
@@ -720,3 +801,11 @@ class PowerAssetList(AssetList):
         else:
             returned_assets = visited_substations
         return PowerAssetList(list(returned_assets), cognite_client=self._cognite_client)
+
+    def current_limits_dataframe(self) -> "pd.DataFrame":
+        if not self.has_type("ACLineSegment"):
+            raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
+        res_list = execute_tasks_concurrently(
+            ACLineSegment.current_limits_dataframe, [(a,) for a in self], max_workers=10
+        )
+        return pd.concat(res_list.joined_results())
