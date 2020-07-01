@@ -398,7 +398,7 @@ class ACLineSegment(PowerAsset):
     def temperature_curve_data(self) -> "PowerAssetList":
         return self.temperature_curves().relationship_sources("TemperatureCurveData")
 
-    def current_limits_dataframe(self) -> "pd.DataFrame":
+    def current_limits_overview(self) -> "pd.DataFrame":
         current_limits = self.current_limits()
         temp_coefficients = self.temperature_curve_data()
         return pd.DataFrame(
@@ -802,7 +802,7 @@ class PowerAssetList(AssetList):
             returned_assets = visited_substations
         return PowerAssetList(list(returned_assets), cognite_client=self._cognite_client)
 
-    def current_limits_dataframe(self) -> "pd.DataFrame":
+    def current_limits_overview(self) -> "pd.DataFrame":
         if not self.has_type("ACLineSegment"):
             raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
         res_list = execute_tasks_concurrently(
