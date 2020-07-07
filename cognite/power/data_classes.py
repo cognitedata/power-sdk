@@ -806,6 +806,6 @@ class PowerAssetList(AssetList):
         if not self.has_type("ACLineSegment"):
             raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
         res_list = execute_tasks_concurrently(
-            ACLineSegment.current_limits_dataframe, [(a,) for a in self], max_workers=10
+            ACLineSegment.current_limits_overview, [(a,) for a in self], max_workers=10
         )
         return pd.concat(res_list.joined_results())
