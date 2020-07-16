@@ -399,6 +399,7 @@ class ACLineSegment(PowerAsset):
         return self.temperature_curves().relationship_sources("TemperatureCurveData")
 
     def current_limits_overview(self) -> "pd.DataFrame":
+        """Returns a dataframe which combines data from `temperature_curve_data` and `current_limits` """
         current_limits = self.current_limits()
         temp_coefficients = self.temperature_curve_data()
         return pd.DataFrame(
@@ -422,7 +423,20 @@ class ACLineSegment(PowerAsset):
         granularity="1h",
         dropna=True,
         index_granularity=0.1,
-    ):
+    ) -> "pd.DataFrame":
+        """Calculates a load-duration curve.
+
+        Args:
+            start, end: string, timestamp or datetime for start and end, as in datapoints.retrieve
+            terminal, measurement_type, timeseries_type: which measurement of which terminal to retrieve.
+            granularity: granularity to be used in retrieving time series data.
+            dropna: whether to drop NaN values / gaps
+            index_granularity: spacing of the regularized return value in %, e.g. 0.1 gives back 1001 elements.
+
+        Returns:
+            pd.DataFrame: dataframe with a load duration curve
+        """
+
         ts = assert_single_result(
             self.terminals(sequence_number=terminal).time_series(
                 measurement_type=measurement_type, timeseries_type=timeseries_type
@@ -830,6 +844,7 @@ class PowerAssetList(AssetList):
         return PowerAssetList(list(returned_assets), cognite_client=self._cognite_client)
 
     def current_limits_overview(self) -> "pd.DataFrame":
+        """See ACLineSegment#current_limits_overview"""
         if not self.has_type("ACLineSegment"):
             raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
         res_list = execute_tasks_concurrently(
@@ -848,6 +863,7 @@ class PowerAssetList(AssetList):
         dropna=True,
         index_granularity=0.1,
     ) -> "pd.DataFrame":
+        """See ACLineSegment#load_duration_curve"""
         if not self.has_type("ACLineSegment"):
             raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
         if len(self.data) > 1000:
