@@ -99,6 +99,48 @@ WindGeneratingUnit
     :members:
     :show-inheritance:
 
+BusbarSection
+^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.BusbarSection
+    :members:
+    :show-inheritance:
+
+ConformLoad
+^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.ConformLoad
+    :members:
+    :show-inheritance:
+
+NonConformLoad
+^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.NonConformLoad
+    :members:
+    :show-inheritance:
+
+NonConformLoad
+^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.NonConformLoad
+    :members:
+    :show-inheritance:
+
+PetersenCoil
+^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.PetersenCoil
+    :members:
+    :show-inheritance:
+
+ShuntCompensator
+^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.ShuntCompensator
+    :members:
+    :show-inheritance:
+
+StaticVarCompensator
+^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.StaticVarCompensator
+    :members:
+    :show-inheritance:
+
 Terminal
 ^^^^^^^^
 .. autoclass:: cognite.power.data_classes.Terminal
@@ -110,6 +152,37 @@ Analog
 .. autoclass:: cognite.power.data_classes.Analog
     :members:
     :show-inheritance:
+
+OperationalLimitSet
+^^^^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.OperationalLimitSet
+    :members:
+    :show-inheritance:
+
+OperationalLimitType
+^^^^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.OperationalLimitType
+    :members:
+    :show-inheritance:
+
+TemperatureCurve
+^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.TemperatureCurve
+    :members:
+    :show-inheritance:
+
+TemperatureCurveData
+^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.TemperatureCurveData
+    :members:
+    :show-inheritance:
+
+TemperatureCurveDependentLimit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.TemperatureCurveDependentLimit
+    :members:
+    :show-inheritance:
+
 
 Power Corridor
 --------------

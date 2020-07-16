@@ -399,6 +399,7 @@ class ACLineSegment(PowerAsset):
         return self.temperature_curves().relationship_sources("TemperatureCurveData")
 
     def current_limits_overview(self) -> "pd.DataFrame":
+        """Returns a dataframe which combines data from `temperature_curve_data` and `current_limits` """
         current_limits = self.current_limits()
         temp_coefficients = self.temperature_curve_data()
         return pd.DataFrame(
@@ -411,6 +412,46 @@ class ACLineSegment(PowerAsset):
             for current_limit in current_limits
             for coeff in temp_coefficients
         ).set_index(["name", "type", "temperature"])
+
+    def load_duration_curve(
+        self,
+        start,
+        end="now",
+        terminal=1,
+        measurement_type="ThreePhaseActivePower",
+        timeseries_type="estimated_value",
+        granularity="1h",
+        dropna=True,
+        index_granularity=0.1,
+    ) -> "pd.DataFrame":
+        """Calculates a load-duration curve.
+
+        Args:
+            start, end: string, timestamp or datetime for start and end, as in datapoints.retrieve
+            terminal, measurement_type, timeseries_type: which measurement of which terminal to retrieve.
+            granularity: granularity to be used in retrieving time series data.
+            dropna: whether to drop NaN values / gaps
+            index_granularity: spacing of the regularized return value in %, e.g. 0.1 gives back 1001 elements.
+
+        Returns:
+            pd.DataFrame: dataframe with a load duration curve
+        """
+
+        ts = assert_single_result(
+            self.terminals(sequence_number=terminal).time_series(
+                measurement_type=measurement_type, timeseries_type=timeseries_type
+            )
+        )
+        df = self._cognite_client.datapoints.retrieve_dataframe(
+            id=ts.id, start=start, end=end, granularity=granularity, aggregates=["interpolation"], complete="fill"
+        )
+        if dropna:
+            df = df.dropna()
+        index = np.linspace(start=0, stop=1, num=round(100 / index_granularity + 1))
+        regular_spacing = np.interp(
+            index, np.linspace(start=0, stop=1, num=df.shape[0]), df.iloc[:, 0].sort_values(ascending=False).values
+        )
+        return pd.DataFrame(index=index, data=regular_spacing, columns=[self.name])
 
 
 class PowerAssetList(AssetList):
@@ -803,9 +844,36 @@ class PowerAssetList(AssetList):
         return PowerAssetList(list(returned_assets), cognite_client=self._cognite_client)
 
     def current_limits_overview(self) -> "pd.DataFrame":
+        """See ACLineSegment#current_limits_overview"""
         if not self.has_type("ACLineSegment"):
             raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
         res_list = execute_tasks_concurrently(
             ACLineSegment.current_limits_overview, [(a,) for a in self], max_workers=10
         )
         return pd.concat(res_list.joined_results())
+
+    def load_duration_curve(
+        self,
+        start,
+        end="now",
+        terminal=1,
+        measurement_type="ThreePhaseActivePower",
+        timeseries_type="estimated_value",
+        granularity="1h",
+        dropna=True,
+        index_granularity=0.1,
+    ) -> "pd.DataFrame":
+        """See ACLineSegment#load_duration_curve"""
+        if not self.has_type("ACLineSegment"):
+            raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
+        if len(self.data) > 1000:
+            raise ValueError("Too many line segments in this list to get load duration curves")
+        res_list = execute_tasks_concurrently(
+            ACLineSegment.load_duration_curve,
+            [
+                (a, start, end, terminal, measurement_type, timeseries_type, granularity, dropna, index_granularity)
+                for a in self
+            ],
+            max_workers=10,
+        )
+        return pd.concat(res_list.joined_results(), axis=1)

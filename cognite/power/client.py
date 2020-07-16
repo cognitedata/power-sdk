@@ -36,6 +36,7 @@ class PowerClient(CogniteClient):
         * ``.operational_limit_sets``
         * ``.operational_limit_types``
         * ``.power_assets``: does not filter by type.
+
     Each of which is a GenericPowerAPI which returns assets of the relevant type(s).
     """
 
