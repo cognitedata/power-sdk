@@ -102,6 +102,48 @@ class PowerAsset(Asset):
             return lambda a: a.sequence_number in sequence_number
 
 
+class LoadDurationMixin:
+    def load_duration_curve(
+        self,
+        start,
+        end="now",
+        terminal=1,
+        measurement_type="ThreePhaseActivePower",
+        timeseries_type="estimated_value",
+        granularity="1h",
+        dropna=True,
+        index_granularity=0.1,
+    ) -> "pd.DataFrame":
+        """Calculates a load-duration curve.
+
+        Args:
+            start, end: string, timestamp or datetime for start and end, as in datapoints.retrieve
+            terminal, measurement_type, timeseries_type: which measurement of which terminal to retrieve.
+            granularity: granularity to be used in retrieving time series data.
+            dropna: whether to drop NaN values / gaps
+            index_granularity: spacing of the regularized return value in %, e.g. 0.1 gives back 1001 elements.
+
+        Returns:
+            pd.DataFrame: dataframe with a load duration curve
+        """
+
+        ts = assert_single_result(
+            self.terminals(sequence_number=terminal).time_series(
+                measurement_type=measurement_type, timeseries_type=timeseries_type
+            )
+        )
+        df = self._cognite_client.datapoints.retrieve_dataframe(
+            id=ts.id, start=start, end=end, granularity=granularity, aggregates=["interpolation"], complete="fill"
+        )
+        if dropna:
+            df = df.dropna()
+        index = np.linspace(start=0, stop=1, num=round(100 / index_granularity + 1))
+        regular_spacing = np.interp(
+            index, np.linspace(start=0, stop=1, num=df.shape[0]), df.iloc[:, 0].sort_values(ascending=False).values
+        )
+        return pd.DataFrame(index=index, data=regular_spacing, columns=[self.name])
+
+
 class Terminal(PowerAsset):
     def analogs(self) -> "PowerAssetList":
         """Shortcut for finding the associated Analogs for a Terminal"""
@@ -288,7 +330,7 @@ class Substation(PowerAsset):
         return np.inf
 
 
-class PowerTransformerEnd(PowerAsset):
+class PowerTransformerEnd(PowerAsset, LoadDurationMixin):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
@@ -354,7 +396,7 @@ class NonConformLoad(PowerAsset):
     pass
 
 
-class SynchronousMachine(PowerAsset):
+class SynchronousMachine(PowerAsset, LoadDurationMixin):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
@@ -373,7 +415,7 @@ class SynchronousMachine(PowerAsset):
         return self.generating_unit().substation()
 
 
-class ACLineSegment(PowerAsset):
+class ACLineSegment(PowerAsset, LoadDurationMixin):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
@@ -412,46 +454,6 @@ class ACLineSegment(PowerAsset):
             for current_limit in current_limits
             for coeff in temp_coefficients
         ).set_index(["name", "type", "temperature"])
-
-    def load_duration_curve(
-        self,
-        start,
-        end="now",
-        terminal=1,
-        measurement_type="ThreePhaseActivePower",
-        timeseries_type="estimated_value",
-        granularity="1h",
-        dropna=True,
-        index_granularity=0.1,
-    ) -> "pd.DataFrame":
-        """Calculates a load-duration curve.
-
-        Args:
-            start, end: string, timestamp or datetime for start and end, as in datapoints.retrieve
-            terminal, measurement_type, timeseries_type: which measurement of which terminal to retrieve.
-            granularity: granularity to be used in retrieving time series data.
-            dropna: whether to drop NaN values / gaps
-            index_granularity: spacing of the regularized return value in %, e.g. 0.1 gives back 1001 elements.
-
-        Returns:
-            pd.DataFrame: dataframe with a load duration curve
-        """
-
-        ts = assert_single_result(
-            self.terminals(sequence_number=terminal).time_series(
-                measurement_type=measurement_type, timeseries_type=timeseries_type
-            )
-        )
-        df = self._cognite_client.datapoints.retrieve_dataframe(
-            id=ts.id, start=start, end=end, granularity=granularity, aggregates=["interpolation"], complete="fill"
-        )
-        if dropna:
-            df = df.dropna()
-        index = np.linspace(start=0, stop=1, num=round(100 / index_granularity + 1))
-        regular_spacing = np.interp(
-            index, np.linspace(start=0, stop=1, num=df.shape[0]), df.iloc[:, 0].sort_values(ascending=False).values
-        )
-        return pd.DataFrame(index=index, data=regular_spacing, columns=[self.name])
 
 
 class PowerAssetList(AssetList):
@@ -864,7 +866,7 @@ class PowerAssetList(AssetList):
         index_granularity=0.1,
     ) -> "pd.DataFrame":
         """See ACLineSegment#load_duration_curve"""
-        if not self.has_type("ACLineSegment"):
+        if self.type not in ["ACLineSegment", "PowerTransformerEnd", "SynchronousMachine"]:
             raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
         if len(self.data) > 1000:
             raise ValueError("Too many line segments in this list to get load duration curves")
