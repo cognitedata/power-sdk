@@ -86,7 +86,7 @@ class PowerAsset(Asset):
     @staticmethod
     def _load_from_asset(asset, class_name, cognite_client):
         cls = _str_to_class(class_name) or PowerAsset
-        power_asset = cls(cognite_client=cognite_client, **asset.dump())
+        power_asset = cls._load(asset.dump(), cognite_client=cognite_client)
         if cls is not PowerAsset:
             assert power_asset.type in [
                 None,
@@ -328,6 +328,19 @@ class Substation(PowerAsset):
             visited.update(level_visit)
             distance += 1
         return np.inf
+
+
+class PowerTransferCorridor(PowerAsset, LoadDurationMixin):
+    def synchronous_machines(self) -> "PowerAssetList":
+        """Shortcut for finding the associated SynchronousMachines for a PowerTransferCorridor.."""
+        return self.relationship_sources("SynchronousMachine")
+
+    def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
+        """Shortcut for finding the associated Terminals"""
+        filter = self._sequence_number_filter(sequence_number)
+        return self.synchronous_machines().relationship_sources(
+            "Terminal", relationship_type="connectsTo", x_filter=filter
+        )
 
 
 class PowerTransformerEnd(PowerAsset, LoadDurationMixin):
@@ -866,8 +879,8 @@ class PowerAssetList(AssetList):
         index_granularity=0.1,
     ) -> "pd.DataFrame":
         """See ACLineSegment#load_duration_curve"""
-        if self.type not in ["ACLineSegment", "PowerTransformerEnd", "SynchronousMachine"]:
-            raise WrongPowerTypeError(f"Can't get connected current limits dataframe for a list of {self.type}")
+        if self.type not in ["ACLineSegment", "PowerTransformerEnd", "SynchronousMachine", "PowerTransferCorridor"]:
+            raise WrongPowerTypeError(f"Can't get load duration curves dataframe for a list of {self.type}")
         if len(self.data) > 1000:
             raise ValueError("Too many line segments in this list to get load duration curves")
         res_list = execute_tasks_concurrently(

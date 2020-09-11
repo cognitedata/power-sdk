@@ -81,6 +81,12 @@ PowerTransformerEnd
     :members:
     :show-inheritance:
 
+PowerTransferCorridor
+^^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: cognite.power.data_classes.PowerTransferCorridor
+    :members:
+    :show-inheritance:
+
 SynchronousMachine
 ^^^^^^^^^^^^^^^^^^
 .. autoclass:: cognite.power.data_classes.SynchronousMachine
