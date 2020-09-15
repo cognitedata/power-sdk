@@ -145,8 +145,8 @@ def edge_locations(power_area, node_locations):
             lat_len = abs(lat[1] - lat[0])
             lon_len = abs(lon[1] - lon[0])
             edge_length = math.sqrt((lat_len) ** 2 + (lon_len) ** 2)
-            center_lat += 0.005 * dups[(acls[0], acls[1])] * lon_len / edge_length
-            center_lon += 0.005 * dups[(acls[0], acls[1])] * lat_len / edge_length
+            center_lat += 0.005 * dups[(acls[0], acls[1])] * lon_len / (edge_length + 1e-6)
+            center_lon += 0.005 * dups[(acls[0], acls[1])] * lat_len / (edge_length + 1e-6)
             dups[(acls[0], acls[1])] *= -1
         base_voltage = acls[2]["object"].metadata.get("BaseVoltage_nominalVoltage", "0")
         lats[base_voltage] += [lat[0], center_lat, lat[1], math.nan]
