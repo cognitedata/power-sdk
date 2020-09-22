@@ -330,7 +330,7 @@ class Substation(PowerAsset):
         return np.inf
 
 
-class PowerTransferCorridor(PowerAsset, LoadDurationMixin):
+class PowerTransferCorridor(PowerAsset):
     def synchronous_machines(self) -> "PowerAssetList":
         """Shortcut for finding the associated SynchronousMachines for a PowerTransferCorridor.."""
         return self.relationship_sources("SynchronousMachine")
@@ -879,7 +879,7 @@ class PowerAssetList(AssetList):
         index_granularity=0.1,
     ) -> "pd.DataFrame":
         """See ACLineSegment#load_duration_curve"""
-        if self.type not in ["ACLineSegment", "PowerTransformerEnd", "SynchronousMachine", "PowerTransferCorridor"]:
+        if self.type not in ["ACLineSegment", "PowerTransformerEnd", "SynchronousMachine"]:  # , "PowerTransferCorridor"
             raise WrongPowerTypeError(f"Can't get load duration curves dataframe for a list of {self.type}")
         if len(self.data) > 1000:
             raise ValueError("Too many line segments in this list to get load duration curves")
