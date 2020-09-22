@@ -21,6 +21,7 @@ class PowerClient(CogniteClient):
         * ``.thermal_generating_units``
         * ``.power_transformers``
         * ``.power_transformer_ends``
+        * ``.power_transfer_corridors``
         * ``.busbar_sections``
         * ``.conform_loads``
         * ``.nonconform_loads``
@@ -64,6 +65,8 @@ class PowerClient(CogniteClient):
 
         self.power_transformers = GenericPowerAPI("PowerTransformer", self.config, self._API_VERSION, self)
         self.power_transformer_ends = PowerTransformerEndsAPI(self.config, self._API_VERSION, self)
+
+        self.power_transfer_corridors = GenericPowerAPI("PowerTransferCorridor", self.config, self._API_VERSION, self)
 
         self.shunt_compensators = GenericPowerAPI("ShuntCompensator", self.config, self._API_VERSION, self)
         self.static_var_compensators = GenericPowerAPI("StaticVarCompensator", self.config, self._API_VERSION, self)
