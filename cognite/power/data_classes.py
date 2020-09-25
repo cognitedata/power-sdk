@@ -81,7 +81,7 @@ class PowerAsset(Asset):
         """
         metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
         metadata_filter = {k: v for k, v in metadata_filter.items() if v}
-        return self._cognite_client.time_series.list(asset_subtree_ids=[self.id], metadata=metadata_filter)
+        return self._cognite_client.time_series.list(asset_subtree_ids=[self.id], metadata=metadata_filter, limit=None)
 
     @staticmethod
     def _load_from_asset(asset, class_name, cognite_client):
@@ -187,7 +187,9 @@ class Analog(PowerAsset):
 
 
 class BusbarSection(PowerAsset):
-    pass
+    def substation(self) -> "Substation":
+        """Shortcut for finding the substation for a PowerTransformer"""
+        return assert_single_result(self.relationship_targets("Substation"))
 
 
 class CurrentLimit(PowerAsset):
@@ -733,6 +735,7 @@ class PowerAssetList(AssetList):
             or self.has_type("WindGeneratingUnit")
             or self.has_type("ThermalGeneratingUnit")
             or self.has_type("HydroGeneratingUnit")
+            or self.has_type("BusbarSection")
         ):
             return self.relationship_targets("Substation")
         elif self.has_type("ACLineSegment"):
@@ -812,7 +815,7 @@ class PowerAssetList(AssetList):
         chunk_size = 100
         ids = [a.id for a in self.data]
         tasks = [
-            {"asset_subtree_ids": ids[i : i + self._retrieve_chunk_size], "metadata": metadata_filter}
+            {"asset_subtree_ids": ids[i : i + self._retrieve_chunk_size], "metadata": metadata_filter, "limit": None}
             for i in range(0, len(ids), chunk_size)
         ]
         res_list = execute_tasks_concurrently(self._cognite_client.time_series.list, tasks, max_workers=10)
