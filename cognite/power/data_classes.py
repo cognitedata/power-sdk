@@ -71,17 +71,19 @@ class PowerAsset(Asset):
         """Shortcut for finding the associated Analogs (via it's terminals)"""
         return self.terminals().analogs()
 
-    def time_series(self, measurement_type: str = None, timeseries_type: str = None, **kwargs):
+    def time_series(
+        self, measurement_type: Union[str, List[str]] = None, timeseries_type: Union[str, List[str]] = None, **kwargs
+    ):
         """Retrieves the time series in the asset subtree.
 
         Args:
-            measurement_type: Type of measurement, e.g. ThreePhaseActivePower
-            timeseries_type: Type of time series, e.g. estimated_value
+            measurement_type: Type of measurement, e.g. "ThreePhaseActivePower", or list thereof
+            timeseries_type: Type of time series, e.g. "estimated_value", or list thereof
             kwargs: Other metadata filters
         """
-        metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
-        metadata_filter = {k: v for k, v in metadata_filter.items() if v}
-        return self._cognite_client.time_series.list(asset_subtree_ids=[self.id], metadata=metadata_filter, limit=None)
+        return PowerAssetList([self], cognite_client=self._cognite_client).time_series(
+            measurement_type=measurement_type, timeseries_type=timeseries_type, **kwargs
+        )
 
     @staticmethod
     def _load_from_asset(asset, class_name, cognite_client):
@@ -803,21 +805,34 @@ class PowerAssetList(AssetList):
         else:
             raise WrongPowerTypeError(f"Can't get opposite ends for a list of {self.type}")
 
-    def time_series(self, measurement_type=None, timeseries_type=None, **kwargs) -> TimeSeriesList:
+    def time_series(
+        self, measurement_type: Union[str, List[str]] = None, timeseries_type: Union[str, List[str]] = None, **kwargs
+    ) -> TimeSeriesList:
         """Retrieves the time series in the asset subtrees.
 
         Args:
-            measurement_type: Type of measurement, e.g. ThreePhaseActivePower
-            timeseries_type: Type of time series, e.g. estimated_value
+            measurement_type: Type of measurement, e.g. "ThreePhaseActivePower", or list thereof
+            timeseries_type: Type of time series, e.g. "estimated_value", or list thereof
             kwargs: Other metadata filters"""
-        metadata_filter = {"measurement_type": measurement_type, "timeseries_type": timeseries_type, **kwargs}
-        metadata_filter = {k: v for k, v in metadata_filter.items() if v}
-        chunk_size = 100
-        ids = [a.id for a in self.data]
-        tasks = [
-            {"asset_subtree_ids": ids[i : i + self._retrieve_chunk_size], "metadata": metadata_filter, "limit": None}
-            for i in range(0, len(ids), chunk_size)
-        ]
+        if not isinstance(measurement_type, Iterable):
+            measurement_type = [measurement_type]
+        if not isinstance(timeseries_type, Iterable):
+            timeseries_type = [timeseries_type]
+        tasks = []
+        for ts_type in timeseries_type:
+            for mt_type in measurement_type:
+                metadata_filter = {"measurement_type": mt_type, "timeseries_type": ts_type, **kwargs}
+                metadata_filter = {k: v for k, v in metadata_filter.items() if v}
+                chunk_size = 100
+                ids = [a.id for a in self.data]
+                tasks = [
+                    {
+                        "asset_subtree_ids": ids[i : i + self._retrieve_chunk_size],
+                        "metadata": metadata_filter,
+                        "limit": None,
+                    }
+                    for i in range(0, len(ids), chunk_size)
+                ]
         res_list = execute_tasks_concurrently(self._cognite_client.time_series.list, tasks, max_workers=10)
         return TimeSeriesList(sum(res_list.joined_results(), []))
 
