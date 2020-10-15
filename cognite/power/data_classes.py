@@ -596,10 +596,10 @@ class PowerAssetList(AssetList):
             PowerAssetList: list of connected assets
         """
         if _sources and _targets:
-            raise ArgumentError("Can not combine _sources and _targets.")
+            raise ValueError("Can not combine _sources and _targets.")
         if not _sources and not _targets:
             return PowerAssetList([], cognite_client=self._cognite_client)
-        rels = self._cognite_client.relationships.list(
+        rels = self._cognite_client.relationships_playground.list(
             sources=_sources, targets=_targets, relationship_type=relationship_type, limit=None
         )
         if _sources:
@@ -814,25 +814,27 @@ class PowerAssetList(AssetList):
             measurement_type: Type of measurement, e.g. "ThreePhaseActivePower", or list thereof
             timeseries_type: Type of time series, e.g. "estimated_value", or list thereof
             kwargs: Other metadata filters"""
-        if not isinstance(measurement_type, Iterable):
+        if isinstance(measurement_type, str):
             measurement_type = [measurement_type]
-        if not isinstance(timeseries_type, Iterable):
+        if isinstance(timeseries_type, str):
             timeseries_type = [timeseries_type]
         tasks = []
-        for ts_type in timeseries_type:
-            for mt_type in measurement_type:
+        for ts_type in timeseries_type or [None]:
+            for mt_type in measurement_type or [None]:
                 metadata_filter = {"measurement_type": mt_type, "timeseries_type": ts_type, **kwargs}
                 metadata_filter = {k: v for k, v in metadata_filter.items() if v}
                 chunk_size = 100
                 ids = [a.id for a in self.data]
-                tasks = [
-                    {
-                        "asset_subtree_ids": ids[i : i + self._retrieve_chunk_size],
-                        "metadata": metadata_filter,
-                        "limit": None,
-                    }
-                    for i in range(0, len(ids), chunk_size)
-                ]
+                tasks.extend(
+                    [
+                        {
+                            "asset_subtree_ids": ids[i : i + self._retrieve_chunk_size],
+                            "metadata": metadata_filter,
+                            "limit": None,
+                        }
+                        for i in range(0, len(ids), chunk_size)
+                    ]
+                )
         res_list = execute_tasks_concurrently(self._cognite_client.time_series.list, tasks, max_workers=10)
         return TimeSeriesList(sum(res_list.joined_results(), []))
 

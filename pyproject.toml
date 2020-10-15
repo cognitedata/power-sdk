@@ -39,8 +39,7 @@ commands =
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
-cognite-sdk-experimental = "^0."
-cognite-sdk = "^2.2" # remove later
+cognite-sdk-experimental = ">= 0.26"
 numpy = "^1.18.1"
 networkx = "^2.4"
 matplotlib = "^3.2.1"
