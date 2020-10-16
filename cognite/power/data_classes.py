@@ -281,8 +281,8 @@ class Substation(PowerAsset):
         """Shortcut for finding the connected ACLineSegments for a substation"""
         return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
 
-    def busbar_sections(self):
-        return self.relationship_sources("BusbarSection")
+    def busbar_sections(self, base_voltage: Iterable = None):
+        return self.relationship_sources("BusbarSection", base_voltage=base_voltage)
 
     def conform_loads(self):
         return self.relationship_sources("ConformLoad")
