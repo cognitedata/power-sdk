@@ -28,7 +28,7 @@ class PowerGraph:
         ac_line_segment_from_extid = {s.external_id: s for s in ac_line_segments if s.external_id}
 
         terminal_con_ac_line_segments = defaultdict(list)
-        for rel in self._cognite_client.relationships.list(
+        for rel in self._cognite_client.relationships_playground.list(
             targets=[{"resourceId": acl.external_id} for acl in ac_line_segments],
             relationship_type="connectsTo",
             limit=None,
@@ -50,7 +50,7 @@ class PowerGraph:
         substation_con_ac_line_segments = defaultdict(list)
         ac_line_segment_con_substations = defaultdict(list)
 
-        for rel in self._cognite_client.relationships.list(
+        for rel in self._cognite_client.relationships_playground.list(
             targets=[{"resourceId": s.external_id} for s in substations], relationship_type="belongsTo", limit=None
         ):
             substation = rel.target["resourceId"]
