@@ -831,6 +831,7 @@ class PowerAssetList(AssetList):
                             "asset_subtree_ids": ids[i : i + self._retrieve_chunk_size],
                             "metadata": metadata_filter,
                             "limit": None,
+                            **kwargs,
                         }
                         for i in range(0, len(ids), chunk_size)
                     ]
