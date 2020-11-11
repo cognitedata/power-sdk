@@ -72,7 +72,11 @@ class PowerAsset(Asset):
         return self.terminals().analogs()
 
     def time_series(
-        self, measurement_type: Union[str, List[str]] = None, timeseries_type: Union[str, List[str]] = None, **kwargs
+        self,
+        measurement_type: Union[str, List[str]] = None,
+        timeseries_type: Union[str, List[str]] = None,
+        unit: str = None,
+        **kwargs,
     ):
         """Retrieves the time series in the asset subtree.
 
@@ -82,7 +86,7 @@ class PowerAsset(Asset):
             kwargs: Other metadata filters
         """
         return PowerAssetList([self], cognite_client=self._cognite_client).time_series(
-            measurement_type=measurement_type, timeseries_type=timeseries_type, **kwargs
+            measurement_type=measurement_type, timeseries_type=timeseries_type, unit=unit, **kwargs
         )
 
     @staticmethod
@@ -806,7 +810,11 @@ class PowerAssetList(AssetList):
             raise WrongPowerTypeError(f"Can't get opposite ends for a list of {self.type}")
 
     def time_series(
-        self, measurement_type: Union[str, List[str]] = None, timeseries_type: Union[str, List[str]] = None, **kwargs
+        self,
+        measurement_type: Union[str, List[str]] = None,
+        timeseries_type: Union[str, List[str]] = None,
+        unit: str = None,
+        **kwargs,
     ) -> TimeSeriesList:
         """Retrieves the time series in the asset subtrees.
 
@@ -829,9 +837,9 @@ class PowerAssetList(AssetList):
                     [
                         {
                             "asset_subtree_ids": ids[i : i + self._retrieve_chunk_size],
+                            "unit": unit,
                             "metadata": metadata_filter,
                             "limit": None,
-                            **kwargs,
                         }
                         for i in range(0, len(ids), chunk_size)
                     ]
