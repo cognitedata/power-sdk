@@ -83,6 +83,7 @@ class PowerAsset(Asset):
         Args:
             measurement_type: Type of measurement, e.g. "ThreePhaseActivePower", or list thereof
             timeseries_type: Type of time series, e.g. "estimated_value", or list thereof
+            unit: Unit of the time series, e.g. 'kV'.
             kwargs: Other metadata filters
         """
         return PowerAssetList([self], cognite_client=self._cognite_client).time_series(
@@ -821,6 +822,7 @@ class PowerAssetList(AssetList):
         Args:
             measurement_type: Type of measurement, e.g. "ThreePhaseActivePower", or list thereof
             timeseries_type: Type of time series, e.g. "estimated_value", or list thereof
+            unit: Unit of the time series, e.g. 'kV'.
             kwargs: Other metadata filters"""
         if isinstance(measurement_type, str):
             measurement_type = [measurement_type]
