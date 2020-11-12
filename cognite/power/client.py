@@ -42,12 +42,7 @@ class PowerClient(CogniteClient):
     """
 
     def __init__(
-        self,
-        base_url="https://greenfield.cognitedata.com",
-        project="powerdummy",
-        client_name="Cognite Power SDK",
-        *args,
-        **kwargs,
+        self, base_url=None, project=None, client_name="Cognite Power SDK", *args, **kwargs,
     ):
         super().__init__(project=project, base_url=base_url, client_name=client_name, *args, **kwargs)
 
