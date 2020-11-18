@@ -236,15 +236,21 @@ class OperationalLimitType(PowerAsset):
 
 
 class ShuntCompensator(PowerAsset):
-    pass
+    def substation(self) -> "Substation":
+        """Shortcut for finding the substation for a ShuntCompensator"""
+        return assert_single_result(self.relationship_targets("Substation"))
 
 
 class StaticVarCompensator(PowerAsset):
-    pass
+    def substation(self) -> "Substation":
+        """Shortcut for finding the substation for a StaticVarCompensator"""
+        return assert_single_result(self.relationship_targets("Substation"))
 
 
 class PetersenCoil(PowerAsset):
-    pass
+    def substation(self) -> "Substation":
+        """Shortcut for finding the substation for a PetersenCoil"""
+        return assert_single_result(self.relationship_targets("Substation"))
 
 
 class PowerTransformer(PowerAsset):
@@ -733,7 +739,7 @@ class PowerAssetList(AssetList):
             raise WrongPowerTypeError(f"Can't get NonConformLoad for a list of {self.type}")
 
     def substations(self) -> "PowerAssetList":
-        """Shortcut for finding the associated Substations for a list of PowerTransformer, GeneratingUnit, (Non)ConformLoad, ACLineSegment or Terminal"""
+        """Shortcut for finding the associated Substations for a list of PowerTransformer, GeneratingUnit, (Non)ConformLoad, ACLineSegment, BusbarSection Shunt/StaticVarCompensator, PetersenCoil or Terminal"""
         if (
             self.has_type("PowerTransformer")
             or self.has_type("Terminal")
@@ -743,6 +749,9 @@ class PowerAssetList(AssetList):
             or self.has_type("ThermalGeneratingUnit")
             or self.has_type("HydroGeneratingUnit")
             or self.has_type("BusbarSection")
+            or self.has_type("ShuntCompensator")
+            or self.has_type("StaticVarCompensator")
+            or self.has_type("PetersenCoil")
         ):
             return self.relationship_targets("Substation")
         elif self.has_type("ACLineSegment"):
