@@ -1,6 +1,6 @@
 from typing import *
 
-from cognite.experimental import CogniteClient
+from cognite.client import CogniteClient
 from cognite.power._api.generic_power import GenericPowerAPI
 from cognite.power._api.power_transformer_ends_api import PowerTransformerEndsAPI
 from cognite.power.data_classes import ACLineSegment, Substation

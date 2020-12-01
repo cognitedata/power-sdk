@@ -7,7 +7,7 @@ from typing import *
 import numpy as np
 import pandas as pd
 
-from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList
+from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList, LabelFilter
 from cognite.client.utils._concurrency import execute_tasks_concurrently
 from cognite.power.exceptions import (
     MixedPowerAssetListException,
@@ -587,12 +587,12 @@ class PowerAssetList(AssetList):
     def relationships(
         self,
         power_type: str = None,
-        relationship_type: str = "belongsTo",
+        label: str = "belongsTo",
         base_voltage: Optional[Iterable] = None,
         grid_type: Optional[str] = None,
         x_filter: Optional[Callable] = None,
-        _sources=None,
-        _targets=None,
+        _source_external_ids=None,
+        _target_external_ids=None,
     ) -> "PowerAssetList":
         """Internal function responsible for finding assets connected by relationships. 
 
@@ -606,17 +606,17 @@ class PowerAssetList(AssetList):
         Returns:
             PowerAssetList: list of connected assets
         """
-        if _sources and _targets:
+        if _source_external_ids and _target_external_ids:
             raise ValueError("Can not combine _sources and _targets.")
-        if not _sources and not _targets:
+        if not _source_external_ids and not _target_external_ids:
             return PowerAssetList([], cognite_client=self._cognite_client)
-        rels = self._cognite_client.relationships_playground.list(
-            sources=_sources, targets=_targets, relationship_type=relationship_type, limit=None
+        rels = self._cognite_client.relationships.list(
+            sources=_source_external_ids, targets=_target_external_ids, labels=LabelFilter(contains_all=[label]), limit=None
         )
-        if _sources:
-            asset_ids = [r.target["resourceId"] for r in rels]
+        if _source_external_ids:
+            asset_ids = [r.target_external_ids for r in rels]
         else:
-            asset_ids = [r.source["resourceId"] for r in rels]
+            asset_ids = [r.source_external_ids for r in rels]
 
         return PowerAssetList._filter_and_convert(
             self._cognite_client,
@@ -630,13 +630,13 @@ class PowerAssetList(AssetList):
     def relationship_sources(self, *args, **kwargs) -> "PowerAssetList":
         """Shortcut for finding all assets that are a source, with the current assets as targets. See PowerAssetList.relationships for list of arguments."""
         return self.relationships(
-            _sources=None, _targets=[{"resource": "Asset", "resourceId": a.external_id} for a in self], *args, **kwargs
+            _source_external_ids=None, _target_external_ids=[a.external_id for a in self], *args, **kwargs
         )
 
     def relationship_targets(self, *args, **kwargs) -> "PowerAssetList":
         """Shortcut for finding all assets that are a target, with the current assets as sources. See PowerAssetList.relationships for list of arguments."""
         return self.relationships(
-            _sources=[{"resource": "Asset", "resourceId": a.external_id} for a in self], _targets=None, *args, **kwargs
+            _source_external_ids=[a.external_id for a in self], _target_external_ids=None, *args, **kwargs
         )
 
     def power_transformer_ends(

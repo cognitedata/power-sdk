@@ -4,6 +4,7 @@ import networkx as nx
 import textdistance
 
 from cognite.power.data_classes import PowerAsset
+from cognite.client.data_classes import LabelFilter
 
 
 class PowerGraph:
@@ -28,12 +29,12 @@ class PowerGraph:
         ac_line_segment_from_extid = {s.external_id: s for s in ac_line_segments if s.external_id}
 
         terminal_con_ac_line_segments = defaultdict(list)
-        for rel in self._cognite_client.relationships_playground.list(
-            targets=[{"resourceId": acl.external_id} for acl in ac_line_segments],
-            relationship_type="connectsTo",
+        for rel in self._cognite_client.relationships.list(
+            target_external_ids=[acl.external_id for acl in ac_line_segments],
+            labels=LabelFilter(contains_all=["connectsTo"]),
             limit=None,
         ):
-            terminal_con_ac_line_segments[rel.source["resourceId"]].append(rel.target["resourceId"])
+            terminal_con_ac_line_segments[rel.source_external_id].append(rel.target_external_id)
 
         terminals = self._cognite_client.assets.retrieve_multiple(
             external_ids=list(terminal_con_ac_line_segments.keys())
@@ -50,11 +51,11 @@ class PowerGraph:
         substation_con_ac_line_segments = defaultdict(list)
         ac_line_segment_con_substations = defaultdict(list)
 
-        for rel in self._cognite_client.relationships_playground.list(
-            targets=[{"resourceId": s.external_id} for s in substations], relationship_type="belongsTo", limit=None
+        for rel in self._cognite_client.relationships.list(
+            target_external_ids=[s.external_id for s in substations], labels=LabelFilter(contains_all=["belongsTo"]), limit=None
         ):
-            substation = rel.target["resourceId"]
-            terminal = rel.source["resourceId"]
+            substation = rel.target_external_id
+            terminal = rel.source_external_id
             if substation in substation_from_extid and terminal in terminal_con_ac_line_segments:
                 ac_line_segments = terminal_con_ac_line_segments.get(terminal, [])
                 substation_con_ac_line_segments[substation].extend(
