@@ -611,7 +611,10 @@ class PowerAssetList(AssetList):
         if not _source_external_ids and not _target_external_ids:
             return PowerAssetList([], cognite_client=self._cognite_client)
         rels = self._cognite_client.relationships.list(
-            sources=_source_external_ids, targets=_target_external_ids, labels=LabelFilter(contains_all=[label]), limit=None
+            sources=_source_external_ids,
+            targets=_target_external_ids,
+            labels=LabelFilter(contains_all=[label]),
+            limit=None,
         )
         if _source_external_ids:
             asset_ids = [r.target_external_ids for r in rels]

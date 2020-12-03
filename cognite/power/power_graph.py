@@ -52,7 +52,9 @@ class PowerGraph:
         ac_line_segment_con_substations = defaultdict(list)
 
         for rel in self._cognite_client.relationships.list(
-            target_external_ids=[s.external_id for s in substations], labels=LabelFilter(contains_all=["belongsTo"]), limit=None
+            target_external_ids=[s.external_id for s in substations],
+            labels=LabelFilter(contains_all=["belongsTo"]),
+            limit=None,
         ):
             substation = rel.target_external_id
             terminal = rel.source_external_id
