@@ -11,7 +11,7 @@ from cognite.power.power_graph import PowerGraph
 class PowerClient(CogniteClient):
     """Main entrypoint into Cognite Power SDK. All services are made available through this object.
 
-    In addition to all functionality from the basic and experimental Cognite Python SDK, includes APIs for:
+    In addition to all functionality from the basic Cognite Python SDK, includes APIs for:
 
         * ``.ac_line_segments``
         * ``.substations``

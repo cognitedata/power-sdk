@@ -30,7 +30,7 @@ envlist = py36,py37,py38
 deps =
     pytest
     pytest-cov
-    cognite-sdk-experimental
+    cognite-sdk
     pandas
 
 commands =
@@ -39,7 +39,7 @@ commands =
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
-cognite-sdk = ">= 2.9.0"
+cognite-sdk = ">= 2.10.1"
 numpy = "^1.18.1"
 networkx = "^2.4"
 matplotlib = "^3.2.1"
