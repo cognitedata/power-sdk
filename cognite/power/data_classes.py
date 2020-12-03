@@ -7,7 +7,7 @@ from typing import *
 import numpy as np
 import pandas as pd
 
-from cognite.client.data_classes import Asset, AssetList, AssetUpdate, TimeSeriesList, LabelFilter
+from cognite.client.data_classes import Asset, AssetList, AssetUpdate, LabelFilter, TimeSeriesList
 from cognite.client.utils._concurrency import execute_tasks_concurrently
 from cognite.power.exceptions import (
     MixedPowerAssetListException,

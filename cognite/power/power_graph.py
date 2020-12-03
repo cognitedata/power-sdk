@@ -3,8 +3,8 @@ from collections import defaultdict
 import networkx as nx
 import textdistance
 
-from cognite.power.data_classes import PowerAsset
 from cognite.client.data_classes import LabelFilter
+from cognite.power.data_classes import PowerAsset
 
 
 class PowerGraph:
