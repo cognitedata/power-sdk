@@ -1,4 +1,3 @@
-import math
 import sys
 import warnings
 from collections import defaultdict
@@ -175,9 +174,9 @@ class Terminal(PowerAsset):
             raise ValueError(f"Can't get opposite end for terminal with sequence number {seq_number}, should be 1 or 2")
         opposite_seq_number = 1 if seq_number == 2 else 2
 
-        al = self.relationship_targets(power_type="ACLineSegment", relationship_type="connectsTo")
+        al = self.relationship_targets(power_type="ACLineSegment", label="connectsTo")
         if not al:
-            pte = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+            pte = self.relationship_targets(power_type="PowerTransformerEnd", label="connectsTo")
             if not pte:
                 raise SinglePowerAssetExpected(
                     al,
@@ -353,16 +352,14 @@ class PowerTransferCorridor(PowerAsset):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
-        return self.synchronous_machines().relationship_sources(
-            "Terminal", relationship_type="connectsTo", x_filter=filter
-        )
+        return self.synchronous_machines().relationship_sources("Terminal", label="connectsTo", x_filter=filter)
 
 
 class PowerTransformerEnd(PowerAsset, LoadDurationMixin):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
-        return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
+        return self.relationship_sources("Terminal", label="connectsTo", x_filter=filter)
 
     @property
     def grid_type(self) -> Optional[str]:
@@ -428,7 +425,7 @@ class SynchronousMachine(PowerAsset, LoadDurationMixin):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None):
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
-        return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
+        return self.relationship_sources("Terminal", label="connectsTo", x_filter=filter)
 
     def generating_unit(self) -> GeneratingUnit:
         """Shortcut for finding the associated GeneratingUnit for a SynchronousMachine"""
@@ -447,7 +444,7 @@ class ACLineSegment(PowerAsset, LoadDurationMixin):
     def terminals(self, sequence_number: Optional[Union[int, Iterable]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated Terminals"""
         filter = self._sequence_number_filter(sequence_number)
-        return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
+        return self.relationship_sources("Terminal", label="connectsTo", x_filter=filter)
 
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the connected substations"""
@@ -598,7 +595,7 @@ class PowerAssetList(AssetList):
 
         Args:
             power_type (str): Type of asset, e.g. PowerTransformer
-            relationship_type (str): Type of relationship, typically belongsTo or connectsTo
+            label (str): Label of the relationship, typically belongsTo or connectsTo
             base_voltage (str):
             grid_type (str):
             x_filter (Callable): Other filter to be applied to the asset, returns those for which x_filter(asset) is truthy after converting the asset to the proper type
@@ -611,15 +608,15 @@ class PowerAssetList(AssetList):
         if not _source_external_ids and not _target_external_ids:
             return PowerAssetList([], cognite_client=self._cognite_client)
         rels = self._cognite_client.relationships.list(
-            sources=_source_external_ids,
-            targets=_target_external_ids,
+            source_external_ids=_source_external_ids,
+            target_external_ids=_target_external_ids,
             labels=LabelFilter(contains_all=[label]),
             limit=None,
         )
         if _source_external_ids:
-            asset_ids = [r.target_external_ids for r in rels]
+            asset_ids = [r.target_external_id for r in rels]
         else:
-            asset_ids = [r.source_external_ids for r in rels]
+            asset_ids = [r.source_external_id for r in rels]
 
         return PowerAssetList._filter_and_convert(
             self._cognite_client,
@@ -662,10 +659,7 @@ class PowerAssetList(AssetList):
             end_number_filter = None
         if self.has_type("Terminal"):
             return self.relationship_targets(
-                "PowerTransformerEnd",
-                base_voltage=base_voltage,
-                x_filter=end_number_filter,
-                relationship_type="connectsTo",
+                "PowerTransformerEnd", base_voltage=base_voltage, x_filter=end_number_filter, label="connectsTo",
             )
         else:
             return self.relationship_sources(
@@ -770,7 +764,7 @@ class PowerAssetList(AssetList):
             return self.terminals().ac_line_segments(base_voltage=base_voltage, grid_type=grid_type)
         elif self.has_type("Terminal"):
             return self.relationship_targets(
-                "ACLineSegment", relationship_type="connectsTo", base_voltage=base_voltage, grid_type=grid_type
+                "ACLineSegment", label="connectsTo", base_voltage=base_voltage, grid_type=grid_type,
             )
         elif not self.data:
             return PowerAssetList([], cognite_client=self._cognite_client)
@@ -791,7 +785,7 @@ class PowerAssetList(AssetList):
                 sum([assets.terminals() for _type, assets in self.split_by_type().items()], []),
                 cognite_client=self._cognite_client,
             )
-        return self.relationship_sources("Terminal", relationship_type="connectsTo", x_filter=filter)
+        return self.relationship_sources("Terminal", label="connectsTo", x_filter=filter)
 
     def analogs(self):
         """Shortcut for finding the associated Analogs. Only works when applied directly to a list of Terminals."""
@@ -814,9 +808,9 @@ class PowerAssetList(AssetList):
                     f"Can't get opposite end for list with sequence number(s) {seq_numbers}, should be either all 1 or all 2"
                 )
             opposite_seq_number = 1 if list(seq_numbers)[0] == 2 else 2
-            al = self.relationship_targets(power_type="ACLineSegment", relationship_type="connectsTo")
+            al = self.relationship_targets(power_type="ACLineSegment", label="connectsTo")
             if not al:
-                pte = self.relationship_targets(power_type="PowerTransformerEnd", relationship_type="connectsTo")
+                pte = self.relationship_targets(power_type="PowerTransformerEnd", label="connectsTo")
                 return pte.opposite_ends().terminals(sequence_number=opposite_seq_number)
             return al.terminals(sequence_number=opposite_seq_number)
         else:
