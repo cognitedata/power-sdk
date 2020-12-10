@@ -300,6 +300,9 @@ class Substation(PowerAsset):
     def non_conform_loads(self):
         return self.relationship_sources("NonConformLoad")
 
+    def shunt_compensators(self):
+        return self.relationship_sources("ShuntCompensator")
+
     def generating_units(self, power_type: Optional[Union[str, List[str]]] = None) -> "PowerAssetList":
         """Shortcut for finding the associated GeneratingUnit for a Substation
 
@@ -734,6 +737,14 @@ class PowerAssetList(AssetList):
             return PowerAssetList([], cognite_client=self._cognite_client)
         else:
             raise WrongPowerTypeError(f"Can't get NonConformLoad for a list of {self.type}")
+
+    def shunt_compensators(self):
+        if self.has_type("Substation"):
+            return self.relationship_sources("ShuntCompensator")
+        elif not self.data:
+            return PowerAssetList([], cognite_client=self._cognite_client)
+        else:
+            raise WrongPowerTypeError(f"Can't get ShuntCompensator for a list of {self.type}")
 
     def substations(self) -> "PowerAssetList":
         """Shortcut for finding the associated Substations for a list of PowerTransformer, GeneratingUnit, (Non)ConformLoad, ACLineSegment, BusbarSection Shunt/StaticVarCompensator, PetersenCoil or Terminal"""
