@@ -1,5 +1,4 @@
 import sys
-import warnings
 from collections import defaultdict
 from typing import *
 
@@ -561,29 +560,6 @@ class PowerAssetList(AssetList):
             base_voltage=base_voltage, grid_type=grid_type, x_filter=x_filter
         )
 
-    @staticmethod
-    def _filter_and_convert(
-        client,
-        external_ids,
-        power_type,
-        base_voltage: Iterable = None,
-        grid_type: str = None,
-        x_filter: Callable = None,
-    ) -> "PowerAssetList":
-        external_ids = list(np.unique(external_ids))
-        assets = client.assets.retrieve_multiple(external_ids=external_ids, ignore_unknown_ids=True)
-        if len(assets) != len(external_ids):
-            warnings.warn(
-                "{} assets not found when looking up {}s among {}".format(
-                    len(external_ids) - len(assets), power_type, external_ids
-                )
-            )
-        if power_type:
-            assets = [a for a in assets if (a.metadata or {}).get("type") == power_type]
-        return PowerAssetList._load_assets(
-            assets, power_type, cognite_client=client, base_voltage=base_voltage, grid_type=grid_type, x_filter=x_filter
-        )
-
     def relationships(
         self,
         power_type: str = None,
@@ -610,25 +586,28 @@ class PowerAssetList(AssetList):
             raise ValueError("Can not combine _sources and _targets.")
         if not _source_external_ids and not _target_external_ids:
             return PowerAssetList([], cognite_client=self._cognite_client)
-        rels = self._cognite_client.relationships.list(
-            source_external_ids=_source_external_ids,
-            target_external_ids=_target_external_ids,
-            labels=LabelFilter(contains_all=[label]),
-            limit=None,
+        assets = self._cognite_client.power_assets.list(
+            grid_type=grid_type, base_voltage=base_voltage, **{"metadata": {"type": power_type}}
         )
         if _source_external_ids:
-            asset_ids = [r.target_external_id for r in rels]
+            _target_external_ids = [a.external_id for a in assets]
+            rels = self._cognite_client.relationships.list(
+                source_external_ids=_source_external_ids,
+                target_external_ids=_target_external_ids,
+                labels=LabelFilter(contains_all=[label]),
+                limit=None,
+            )
+            assets = [a for a in assets if a.external_id in [r.target_external_id for r in rels]]
         else:
-            asset_ids = [r.source_external_id for r in rels]
-
-        return PowerAssetList._filter_and_convert(
-            self._cognite_client,
-            asset_ids,
-            power_type,
-            base_voltage=base_voltage,
-            grid_type=grid_type,
-            x_filter=x_filter,
-        )
+            _source_external_ids = [a.external_id for a in assets]
+            rels = self._cognite_client.relationships.list(
+                source_external_ids=_source_external_ids,
+                target_external_ids=_target_external_ids,
+                labels=LabelFilter(contains_all=[label]),
+                limit=None,
+            )
+            assets = [a for a in assets if a.external_id in [r.source_external_id for r in rels]]
+        return PowerAssetList._load_assets(assets, cognite_client=self._cognite_client, x_filter=x_filter)
 
     def relationship_sources(self, *args, **kwargs) -> "PowerAssetList":
         """Shortcut for finding all assets that are a source, with the current assets as targets. See PowerAssetList.relationships for list of arguments."""
