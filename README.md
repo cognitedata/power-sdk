@@ -12,7 +12,7 @@ Cognite Power SDK
 
 
 This is an extensions package to the [Cognite Python SDK](https://github.com/cognitedata/cognite-sdk-python)
- for power grid specific applications in Cognite Data Fusion (CDF). 
+ for power grid specific applications in Cognite Data Fusion (CDF).
 
 ## Quickstart
 Import a client with:
